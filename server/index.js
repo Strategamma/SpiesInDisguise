@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer, WebSocket } from "ws";
-import { addPlayer, chooseOffer, newPlayer, newRoom, restart, roomCode, submitOffer, viewFor } from "./game.js";
+import { addPlayer, chooseOffer, newPlayer, newRoom, restart, roomCode, setReady, startGame, submitOffer, viewFor } from "./game.js";
 
 const root = join(fileURLToPath(new URL("..", import.meta.url)), "public");
 const rooms = new Map();
@@ -32,19 +32,28 @@ wss.on("connection", ws => {
       const message = JSON.parse(raw.toString());
       if (message.type === "create") {
         let code; do { code = roomCode(); } while (rooms.has(code));
-        const player = newPlayer(message.name); player.socket = ws; const room = newRoom(code, player); rooms.set(code, room); ws.identity = { code, index: 0 }; update(room);
+        const player = newPlayer(message.name, message.protocol); player.socket = ws; const room = newRoom(code, player); rooms.set(code, room); ws.identity = { code, index: 0 }; update(room);
       } else if (message.type === "join") {
         const code = String(message.room || "").toUpperCase(); const room = rooms.get(code); if (!room) throw new Error("Room not found.");
         const reconnect = room.players.findIndex(p => p.token === message.token);
         let index = reconnect;
         if (reconnect >= 0) { room.players[reconnect].socket = ws; room.players[reconnect].connected = true; }
-        else { const player = newPlayer(message.name); player.socket = ws; addPlayer(room, player); index = room.players.length - 1; }
+        else { const player = newPlayer(message.name, message.protocol); player.socket = ws; addPlayer(room, player); index = room.players.length - 1; }
         ws.identity = { code, index }; update(room);
       } else {
         if (!ws.identity) throw new Error("Join a room first.");
         const room = rooms.get(ws.identity.code); if (!room) throw new Error("Room expired."); const i = ws.identity.index;
-        if (message.type === "leave") { const player = room.players[i]; if (player?.socket === ws) { player.connected = false; player.socket = null; } ws.identity = null; update(room); return; }
-        if (message.type === "offer") submitOffer(room, i, message.openId, message.hiddenId);
+        if (message.type === "leave") {
+          const player = room.players[i];
+          if (room.phase === "lobby") {
+            if (i === 0) { room.players.slice(1).forEach(other => emit(other.socket, { type: "room_closed" })); rooms.delete(room.code); }
+            else { room.players.splice(i, 1); update(room); }
+          } else if (player?.socket === ws) { player.connected = false; player.socket = null; update(room); }
+          ws.identity = null; return;
+        }
+        if (message.type === "ready") setReady(room, i, message.ready);
+        else if (message.type === "start") startGame(room, i);
+        else if (message.type === "offer") submitOffer(room, i, message.openId, message.hiddenId);
         else if (message.type === "choose") chooseOffer(room, i, message.choice);
         else if (message.type === "rematch") { room.rematchVotes.add(i); if (room.rematchVotes.size === 2) restart(room); }
         else throw new Error("Unknown action.");
@@ -52,7 +61,7 @@ wss.on("connection", ws => {
       }
     } catch (error) { fail(ws, error); }
   });
-  ws.on("close", () => { if (!ws.identity) return; const room = rooms.get(ws.identity.code); const player = room?.players[ws.identity.index]; if (player?.socket === ws) { player.connected = false; update(room); } });
+  ws.on("close", () => { if (!ws.identity) return; const room = rooms.get(ws.identity.code); const player = room?.players[ws.identity.index]; if (player?.socket === ws) { player.connected = false; if (room.phase === "lobby") player.ready = false; update(room); } });
 });
 
 const heartbeat = setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) ws.terminate(); else { ws.isAlive = false; ws.ping(); } } const expiry = Date.now() - 1000 * 60 * 60 * 6; for (const [code, room] of rooms) if (room.updatedAt < expiry) rooms.delete(code); }, 30000);

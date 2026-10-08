@@ -14,3 +14,6 @@
 - Mobile hands use a two-column grid so all four contacts remain scannable without horizontal discovery. The sticky action bar always states the current offer-building step.
 - The pursuit board is a circular signal ring: agents start on opposite sides, advance along the highlighted 12-space arc, and converge on a clearly marked interception point. The center prioritizes remaining distance; a compact legend names both agents and their movement.
 - Primary navigation is a persistent three-item dock: Home, Play, and Rules. Play jumps to mode selection or the current decision, active location is explicit, and leaving an unfinished match always requires confirmation.
+- Launch uses a branded, tap-to-enter signal splash; that gesture safely enables optional synthesized game audio. A persistent header control stores the sound preference. Motion remains restrained and honors reduced-motion settings.
+- Online rooms open into an explicit lobby with two agent slots, room sharing, connected/ready status, individual ready controls, and a host-only launch button. No cards are dealt before launch.
+- Results use distinct mission-complete and mission-compromised treatments. Celebration effects never cover rematch or Home actions, and online rematch voting reports its waiting state.

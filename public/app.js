@@ -25,6 +25,61 @@ let localHandoff = false;
 let installPrompt = null;
 let homePanel = pendingRoom ? "wifi" : null;
 let botTimer = null;
+let splashVisible = true;
+let soundEnabled = localStorage.getItem("spies-sound") !== "off";
+let audioContext = null;
+
+const SOUND_PATTERNS = {
+  start: [[220, .08, 0], [330, .1, .08], [494, .16, .17]],
+  tap: [[420, .055, 0]],
+  select: [[330, .05, 0], [520, .07, .045]],
+  offer: [[620, .07, 0], [440, .09, .07]],
+  turn: [[392, .06, 0], [587, .1, .07]],
+  move: [[294, .07, 0], [440, .08, .06], [659, .11, .13]],
+  win: [[392, .1, 0], [494, .1, .09], [587, .1, .18], [784, .24, .27]],
+  lose: [[392, .1, 0], [330, .12, .09], [247, .24, .2]]
+};
+
+async function ensureAudio() {
+  if (!soundEnabled) return null;
+  const Audio = window.AudioContext || window.webkitAudioContext;
+  if (!Audio) return null;
+  audioContext ||= new Audio();
+  if (audioContext.state === "suspended") await audioContext.resume();
+  return audioContext;
+}
+
+async function playSound(name) {
+  if (!soundEnabled) return;
+  try {
+    const audio = await ensureAudio();
+    if (!audio) return;
+    const now = audio.currentTime;
+    (SOUND_PATTERNS[name] || SOUND_PATTERNS.tap).forEach(([frequency, duration, delay]) => {
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      oscillator.type = name === "lose" ? "triangle" : "sine";
+      oscillator.frequency.setValueAtTime(frequency, now + delay);
+      gain.gain.setValueAtTime(.0001, now + delay);
+      gain.gain.exponentialRampToValueAtTime(.045, now + delay + .012);
+      gain.gain.exponentialRampToValueAtTime(.0001, now + delay + duration);
+      oscillator.connect(gain).connect(audio.destination);
+      oscillator.start(now + delay);
+      oscillator.stop(now + delay + duration + .02);
+    });
+  } catch { /* Audio is optional; gameplay must remain unaffected. */ }
+}
+
+function applyState(next) {
+  const previous = state;
+  state = next;
+  if (!previous || splashVisible) return;
+  const priorProgress = previous.players?.reduce((sum, player) => sum + player.progress, 0) || 0;
+  const nextProgress = next.players?.reduce((sum, player) => sum + player.progress, 0) || 0;
+  if (previous.winner === null && next.winner !== null) playSound(playMode === "local" || next.winner === next.you ? "win" : "lose");
+  else if (priorProgress !== nextProgress) playSound("move");
+  else if (previous.phase !== next.phase && next.phase === "offer") playSound("turn");
+}
 
 function gatewayUrl() {
   if (window.SPIES_IN_DISGUISE_GATEWAY || window.SHADOW_CIRCUIT_GATEWAY) return window.SPIES_IN_DISGUISE_GATEWAY || window.SHADOW_CIRCUIT_GATEWAY;
@@ -52,7 +107,7 @@ function connect() {
     const message = JSON.parse(event.data);
     if (message.type === "state") {
       playMode = "wifi";
-      state = message.state;
+      applyState(message.state);
       selected = [];
       faceUpId = null;
       localStorage.setItem(`spies-token-${state.room}`, message.token);
@@ -66,12 +121,22 @@ function connect() {
 function resume() {
   if (!pendingRoom || playMode !== "wifi") return;
   const token = localStorage.getItem(`spies-token-${pendingRoom}`) || localStorage.getItem(`shadow-token-${pendingRoom}`);
-  if (token) send("join", { room: pendingRoom, token, name: savedName || "Agent" });
+  if (token) send("join", { room: pendingRoom, token, name: savedName || "Agent", protocol: 2 });
 }
 
 function shell(content) {
   const inGame = Boolean(state);
-  return `<div class="app-shell"><header class="topbar"><button class="brand brand-button" data-home aria-label="Return to home"><img class="brand-logo" src="./logo.svg" alt="Spies in Disguise"></button><div class="header-actions">${!state && !isInstalled() ? `<button class="install-button" data-install aria-label="Install Spies in Disguise"><span>⇩</span><b>Install</b></button>` : ""}</div></header><div class="app-content">${content}</div><nav class="app-nav" aria-label="Primary navigation"><button class="nav-button ${inGame ? "" : "active"}" data-home ${inGame ? "" : 'aria-current="page"'}><span aria-hidden="true">⌂</span><b>Home</b></button><button class="nav-button ${inGame ? "active" : ""}" data-play ${inGame ? 'aria-current="page"' : ""}><span aria-hidden="true">◉</span><b>Play</b></button><button class="nav-button" data-rules><span aria-hidden="true">?</span><b>Rules</b></button></nav></div>${rulesDialog()}${installDialog()}${leaveDialog()}`;
+  return `<div class="app-shell"><header class="topbar"><button class="brand brand-button" data-home aria-label="Return to home"><img class="brand-logo" src="./logo.svg" alt="Spies in Disguise"></button><div class="header-actions">${!state && !isInstalled() ? `<button class="install-button" data-install aria-label="Install Spies in Disguise"><span>⇩</span><b>Install</b></button>` : ""}<button class="sound-button" data-sound aria-label="${soundEnabled ? "Mute sounds" : "Turn sounds on"}" aria-pressed="${soundEnabled}"><span aria-hidden="true">${soundEnabled ? "♪" : "×"}</span></button></div></header><div class="app-content">${content}</div><nav class="app-nav" aria-label="Primary navigation"><button class="nav-button ${inGame ? "" : "active"}" data-home ${inGame ? "" : 'aria-current="page"'}><span aria-hidden="true">⌂</span><b>Home</b></button><button class="nav-button ${inGame ? "active" : ""}" data-play ${inGame ? 'aria-current="page"' : ""}><span aria-hidden="true">◉</span><b>Play</b></button><button class="nav-button" data-rules><span aria-hidden="true">?</span><b>Rules</b></button></nav></div>${rulesDialog()}${installDialog()}${leaveDialog()}`;
+}
+
+function renderSplash() {
+  app.innerHTML = `<section class="splash"><div class="splash-grid" aria-hidden="true"></div><div class="splash-signal" aria-hidden="true"><span></span><span></span><span></span></div><div class="splash-brand"><img class="splash-icon" src="./icon.svg" alt=""><img class="splash-logo" src="./logo.svg" alt="Spies in Disguise"><p>A game of hidden identities and calculated risks.</p></div><div class="splash-action"><button class="primary" id="enter-game">Enter the circuit</button><span>${soundEnabled ? "Sound on · change anytime" : "Sound off · change anytime"}</span></div></section>`;
+  document.querySelector("#enter-game")?.addEventListener("click", async () => {
+    await ensureAudio();
+    splashVisible = false;
+    playSound("start");
+    render();
+  });
 }
 
 function leaveDialog() {
@@ -89,14 +154,22 @@ function installDialog() {
 function isInstalled() { return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; }
 
 function bindCommon() {
-  document.querySelectorAll("[data-rules]").forEach(button => button.addEventListener("click", () => document.querySelector("#rules").showModal()));
+  document.querySelectorAll("[data-rules]").forEach(button => button.addEventListener("click", () => { playSound("tap"); document.querySelector("#rules").showModal(); }));
   document.querySelectorAll("[data-close-rules]").forEach(button => button.addEventListener("click", () => document.querySelector("#rules").close()));
   document.querySelector("[data-install]")?.addEventListener("click", installApp);
+  document.querySelector("[data-sound]")?.addEventListener("click", toggleSound);
   document.querySelector("[data-close-install]")?.addEventListener("click", () => document.querySelector("#install-dialog").close());
   document.querySelectorAll("[data-home]").forEach(button => button.addEventListener("click", requestHome));
-  document.querySelector("[data-play]")?.addEventListener("click", () => document.querySelector(state ? "#play-area" : "#play-modes")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  document.querySelector("[data-play]")?.addEventListener("click", () => { playSound("tap"); document.querySelector(state ? "#play-area" : "#play-modes")?.scrollIntoView({ behavior: "smooth", block: "start" }); });
   document.querySelector("[data-stay]")?.addEventListener("click", () => document.querySelector("#leave-dialog").close());
   document.querySelector("[data-confirm-home]")?.addEventListener("click", returnHome);
+}
+
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  localStorage.setItem("spies-sound", soundEnabled ? "on" : "off");
+  if (soundEnabled) playSound("select");
+  render();
 }
 
 function requestHome() {
@@ -129,12 +202,13 @@ function renderHome(error = "") {
   bindCommon();
   const remember = () => { const name = document.querySelector("#name")?.value.trim(); if (name) localStorage.setItem("spies-name", name); return name; };
   document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => {
+    playSound("tap");
     if (button.dataset.mode === "wifi") { homePanel = "wifi"; renderHome(); setTimeout(() => document.querySelector("#wifi-setup")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0); }
     else startLocal(button.dataset.mode);
   }));
   document.querySelector("#close-setup")?.addEventListener("click", () => { homePanel = null; renderHome(); });
-  document.querySelector("#create")?.addEventListener("click", () => { const name = remember(); if (!name) return showToast("Choose a codename first"); playMode = "wifi"; send("create", { name }); });
-  document.querySelector("#join")?.addEventListener("click", () => { const name = remember(); const room = document.querySelector("#room").value.trim().toUpperCase(); if (!name) return showToast("Choose a codename first"); if (room.length !== 6) return showToast("Enter the six-character code"); pendingRoom = room; playMode = "wifi"; send("join", { room, name }); });
+  document.querySelector("#create")?.addEventListener("click", () => { const name = remember(); if (!name) return showToast("Choose a codename first"); playMode = "wifi"; send("create", { name, protocol: 2 }); });
+  document.querySelector("#join")?.addEventListener("click", () => { const name = remember(); const room = document.querySelector("#room").value.trim().toUpperCase(); if (!name) return showToast("Choose a codename first"); if (room.length !== 6) return showToast("Enter the six-character code"); pendingRoom = room; playMode = "wifi"; send("join", { room, name, protocol: 2 }); });
 }
 
 function escapeHtml(value = "") { return String(value).replace(/[&<>'"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c])); }
@@ -156,11 +230,11 @@ function localAction(type, payload = {}) {
     if (type === "offer") {
       localOffer(localGame, state.you, payload.openId, payload.hiddenId);
       selected = []; faceUpId = null;
-      if (playMode === "local") { state = localView(localGame, 1 - state.you); localHandoff = true; render(); }
-      else { state = localView(localGame, 0); render(); botTimer = setTimeout(runBotRound, 650); }
+      if (playMode === "local") { applyState(localView(localGame, 1 - state.you)); localHandoff = true; render(); }
+      else { applyState(localView(localGame, 0)); render(); botTimer = setTimeout(runBotRound, 650); }
     } else if (type === "choose") {
       localChoose(localGame, state.you, payload.choice);
-      state = localView(localGame, state.you); render();
+      applyState(localView(localGame, state.you)); render();
     } else if (type === "rematch") startLocal(playMode);
   } catch (error) { showToast(error.message); }
 }
@@ -169,13 +243,13 @@ function runBotRound() {
   if (playMode !== "bot" || !localGame || localGame.winner !== null) return;
   if (localGame.phase === "choose" && localGame.offer.by === 0) {
     localChoose(localGame, 1, chooseBotCard(localGame));
-    state = localView(localGame, 0); render();
+    applyState(localView(localGame, 0)); render();
   }
   if (localGame.winner === null && localGame.phase === "offer" && localGame.turn === 1) {
     botTimer = setTimeout(() => {
       const offer = chooseBotOffer(localGame);
       localOffer(localGame, 1, offer.openId, offer.hiddenId);
-      state = localView(localGame, 0); render();
+      applyState(localView(localGame, 0)); render();
     }, 650);
   }
 }
@@ -189,7 +263,19 @@ function cardHtml(card, options = {}) {
 }
 
 function playerBox(player, index) {
-  return `<div class="player ${index === state.you ? "you" : ""}"><div class="player-name">${escapeHtml(player.name)}${index === state.you ? " · you" : ""}</div><div class="player-meta">${player.connected ? "online" : "reconnecting"} · ${player.progress} spaces</div></div>`;
+  const meta = state.phase === "lobby" ? `${player.connected ? "Connected" : "Reconnecting"} · ${player.ready ? "Ready" : "Not ready"}` : `${player.connected ? "online" : "reconnecting"} · ${player.progress} spaces`;
+  return `<div class="player ${index === state.you ? "you" : ""} ${player.ready ? "ready" : ""}"><div class="player-name">${escapeHtml(player.name)}${index === state.you ? " · you" : ""}</div><div class="player-meta">${meta}</div></div>`;
+}
+
+function lobbyHtml() {
+  const me = state.players[state.you];
+  const canStart = state.isHost && state.players.length === 2 && state.players.every(player => player.connected && player.ready);
+  const slots = [0, 1].map(index => {
+    const player = state.players[index];
+    return player ? `<article class="lobby-agent ${player.ready ? "ready" : ""}"><span class="lobby-avatar">${index === 0 ? "A" : "B"}</span><div><b>${escapeHtml(player.name)}${index === 0 ? " · Host" : ""}</b><small>${player.connected ? player.ready ? "Ready for briefing" : "Choosing loadout" : "Reconnecting…"}</small></div><span class="ready-light"></span></article>` : `<article class="lobby-agent empty"><span class="lobby-avatar">?</span><div><b>Open agent slot</b><small>Share the room code to invite a rival</small></div><span class="ready-light"></span></article>`;
+  }).join("");
+  const hostAction = state.isHost ? `<button class="primary launch-button" id="start-match" ${canStart ? "" : "disabled"}>${state.players.length < 2 ? "Waiting for rival" : canStart ? "Launch mission" : "Waiting for both agents"}</button>` : `<div class="lobby-wait"><span class="signal-mini"></span>${state.players.length < 2 ? "Waiting for another agent" : "The host will launch when both agents are ready"}</div>`;
+  return `<section class="lobby-panel"><div class="lobby-heading"><span class="eyebrow">Secure lobby</span><h2>Assemble your team</h2><p>Both agents must be connected and ready before the host can launch.</p></div><div class="lobby-code"><span>Room code</span><strong>${state.room}</strong><button class="icon-btn" id="share" aria-label="Share room invitation">⧉</button></div><div class="lobby-agents">${slots}</div><button class="ready-button ${me.ready ? "is-ready" : ""}" id="toggle-ready"><span>${me.ready ? "✓" : "○"}</span>${me.ready ? "Ready—tap to cancel" : "Mark me ready"}</button>${hostAction}</section>`;
 }
 
 function trackHtml() {
@@ -211,12 +297,18 @@ function renderGame() {
   const choosing = state.phase === "choose" && !active;
   const waitingForRival = state.phase === "choose" && active;
   let playArea = "";
-  if (localHandoff && playMode === "local") {
+  if (playMode === "wifi" && state.phase === "lobby") {
+    playArea = lobbyHtml();
+  } else if (localHandoff && playMode === "local") {
     playArea = `<div class="panel handoff"><div class="handoff-icon">↻</div><span class="eyebrow">Pass the device</span><h2>${escapeHtml(state.players[state.you].name)}, you’re up.</h2><p class="lede">Make sure the other player has looked away before continuing.</p><button class="primary" id="ready-player">I’m ready</button></div>`;
   } else if (state.winner !== null) {
     const won = state.winner === state.you;
+    const celebrate = playMode === "local" || won;
+    const winner = state.players[state.winner];
     const resultTitle = playMode === "local" ? `${escapeHtml(state.players[state.winner].name)} wins.` : won ? "You found the signal." : `${escapeHtml(state.players[state.winner].name)} found you.`;
-    playArea = `<div class="panel result"><div class="result-badge">${won ? "◆" : "◇"}</div><span class="eyebrow">Cover blown</span><h2>${resultTitle}</h2><p class="lede">${escapeHtml(state.resultReason)}</p><button class="primary" id="again">Play again</button></div>`;
+    const particles = celebrate ? `<div class="confetti" aria-hidden="true">${Array.from({ length: 18 }, (_, i) => `<i style="--i:${i};--x:${4 + (i * 37) % 92}%;--delay:${(i * -.12).toFixed(2)}s"></i>`).join("")}</div>` : "";
+    const rematchLabel = playMode === "wifi" ? state.youRematch ? `Waiting for rival · ${state.rematchVotes}/2` : "Request rematch" : "Play again";
+    playArea = `<div class="panel result ${celebrate ? "victory" : "defeat"}">${particles}<div class="result-rings" aria-hidden="true"></div><div class="result-badge">${celebrate ? "◆" : "◇"}</div><span class="eyebrow">${celebrate ? "Mission complete" : "Mission compromised"}</span><h2>${resultTitle}</h2><p class="lede">${escapeHtml(state.resultReason)}</p><div class="result-summary"><span><small>Winning agent</small><b>${escapeHtml(winner.name)}</b></span><span><small>Distance moved</small><b>${winner.progress}</b></span></div><div class="result-actions"><button class="primary" id="again" ${state.youRematch ? "disabled" : ""}>${rematchLabel}</button><button class="secondary" data-home>Return home</button></div></div>`;
   } else if (state.players.length < 2) {
     playArea = `<div class="panel waiting"><div class="signal"></div><h2>Waiting for a rival</h2><p class="lede">Share the room code or invitation link. The match begins as soon as they connect.</p><button class="primary" id="share">Share invitation</button></div>`;
   } else if (choosing) {
@@ -230,15 +322,17 @@ function renderGame() {
   }
 
   const modeLabel = playMode === "bot" ? "Solo circuit" : playMode === "local" ? "In-person circuit" : "Private room";
-  app.innerHTML = shell(`<div class="panel room-head"><div><span class="eyebrow">${modeLabel}</span><div class="room-code">${playMode === "wifi" ? state.room : playMode === "bot" ? "VS BOT" : "PASS & PLAY"}</div></div>${playMode === "wifi" ? `<button class="icon-btn" id="copy" aria-label="Copy invitation">⧉</button>` : ""}</div><div class="players">${state.players.map(playerBox).join("")}</div>${state.players.length === 2 ? trackHtml() : ""}<div class="game-layout" id="play-area"><section>${playArea}</section><aside class="sidebar"><div class="collections">${state.players.map(collectionHtml).join("")}</div></aside></div>`);
+  app.innerHTML = shell(`<div class="panel room-head"><div><span class="eyebrow">${modeLabel}</span><div class="room-code">${playMode === "wifi" ? state.room : playMode === "bot" ? "VS BOT" : "PASS & PLAY"}</div></div>${playMode === "wifi" ? `<button class="icon-btn" id="copy" aria-label="Copy invitation">⧉</button>` : ""}</div><div class="players">${state.players.map(playerBox).join("")}</div>${state.players.length === 2 && state.phase !== "lobby" ? trackHtml() : ""}<div class="game-layout ${state.phase === "lobby" ? "lobby-layout" : ""}" id="play-area"><section>${playArea}</section>${state.phase === "lobby" ? "" : `<aside class="sidebar"><div class="collections">${state.players.map(collectionHtml).join("")}</div></aside>`}</div>`);
   bindCommon();
-  document.querySelector("#ready-player")?.addEventListener("click", () => { localHandoff = false; render(); });
+  document.querySelector("#ready-player")?.addEventListener("click", () => { playSound("turn"); localHandoff = false; render(); });
   document.querySelector("#copy")?.addEventListener("click", shareRoom);
   document.querySelector("#share")?.addEventListener("click", shareRoom);
-  document.querySelector("#again")?.addEventListener("click", () => send("rematch"));
+  document.querySelector("#again")?.addEventListener("click", () => { playSound("tap"); send("rematch"); });
+  document.querySelector("#toggle-ready")?.addEventListener("click", () => { playSound("select"); send("ready", { ready: !state.players[state.you].ready }); });
+  document.querySelector("#start-match")?.addEventListener("click", () => { playSound("start"); send("start"); });
   document.querySelectorAll(".hand .card").forEach(el => el.addEventListener("click", () => selectCard(el.dataset.card)));
-  document.querySelector("#offer")?.addEventListener("click", () => send("offer", { openId: faceUpId, hiddenId: selected.find(id => id !== faceUpId) }));
-  document.querySelectorAll("[data-choice]").forEach(el => el.addEventListener("click", () => send("choose", { choice: el.dataset.choice })));
+  document.querySelector("#offer")?.addEventListener("click", () => { playSound("offer"); send("offer", { openId: faceUpId, hiddenId: selected.find(id => id !== faceUpId) }); });
+  document.querySelectorAll("[data-choice]").forEach(el => el.addEventListener("click", () => { playSound("select"); send("choose", { choice: el.dataset.choice }); }));
 }
 
 function selectCard(id) {
@@ -253,6 +347,7 @@ function selectCard(id) {
     selected.push(id);
     if (selected.length === 1) faceUpId = null;
   }
+  playSound("select");
   renderGame();
 }
 
@@ -264,8 +359,8 @@ async function shareRoom() {
   } catch (error) { if (error.name !== "AbortError") showToast("Couldn’t share the link"); }
 }
 
-function render() { state ? renderGame() : renderHome(); }
-window.render_game_to_text = () => JSON.stringify(state ? { screen: "game", mode: playMode, you: state.you, turn: state.turn, phase: state.phase, winner: state.winner, selected, revealed: faceUpId, hand: state.hand?.map(card => ({ id: card.id, kind: card.kind })), offer: state.offer ? { open: state.offer.open?.kind, concealed: true } : null, players: state.players.map(player => ({ name: player.name, progress: player.progress, collection: player.collection })) } : { screen: "home", panel: homePanel, connected });
+function render() { splashVisible ? renderSplash() : state ? renderGame() : renderHome(); }
+window.render_game_to_text = () => JSON.stringify(splashVisible ? { screen: "splash", soundEnabled, connected } : state ? { screen: state.phase === "lobby" ? "lobby" : state.winner !== null ? "result" : "game", mode: playMode, you: state.you, turn: state.turn, phase: state.phase, winner: state.winner, selected, revealed: faceUpId, hand: state.hand?.map(card => ({ id: card.id, kind: card.kind })), offer: state.offer ? { open: state.offer.open?.kind, concealed: true } : null, players: state.players.map(player => ({ name: player.name, progress: player.progress, collection: player.collection, connected: player.connected, ready: player.ready })) } : { screen: "home", panel: homePanel, connected, soundEnabled });
 window.advanceTime = () => {};
 addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; render(); });
 addEventListener("appinstalled", () => { installPrompt = null; render(); showToast("Spies in Disguise installed"); });

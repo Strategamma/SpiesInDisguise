@@ -1,8 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addPlayer, chooseOffer, newPlayer, newRoom, submitOffer, viewFor } from "../server/game.js";
+import { addPlayer, chooseOffer, newPlayer, newRoom, setReady, startGame, submitOffer, viewFor } from "../server/game.js";
 
-function roomReady() { const a = newPlayer("A"); const room = newRoom("ABC123", a); addPlayer(room, newPlayer("B")); return room; }
+function roomReady() { const a = newPlayer("A", 2); const room = newRoom("ABC123", a); addPlayer(room, newPlayer("B", 2)); setReady(room, 0, true); setReady(room, 1, true); startGame(room, 0); return room; }
+
+test("online rooms remain in the lobby until both players are ready and the host starts", () => {
+  const room = newRoom("ABC123", newPlayer("Host", 2));
+  assert.equal(room.phase, "lobby"); assert.equal(room.players[0].hand.length, 0);
+  addPlayer(room, newPlayer("Guest", 2));
+  assert.throws(() => startGame(room, 1), /host/);
+  assert.throws(() => startGame(room, 0), /ready/);
+  setReady(room, 0, true); setReady(room, 1, true); room.players[1].connected = false;
+  assert.throws(() => startGame(room, 0), /connected/);
+  room.players[1].connected = true; startGame(room, 0);
+  assert.equal(room.phase, "offer"); assert.equal(room.players[0].hand.length, 4); assert.equal(room.players[1].hand.length, 4);
+});
+
+test("legacy clients remain compatible during the lobby rollout", () => {
+  const room = newRoom("OLD123", newPlayer("Old Host"));
+  addPlayer(room, newPlayer("Old Guest"));
+  assert.equal(room.phase, "offer");
+  assert.equal(room.players[0].hand.length, 4); assert.equal(room.players[1].hand.length, 4);
+});
 
 test("an offer removes cards, refills the hand, and conceals the hidden card", () => {
   const room = roomReady(); room.players[0].hand = [{ id: "a", kind: "courier" }, { id: "b", kind: "ghost" }, { id: "c", kind: "oracle" }, { id: "d", kind: "handler" }];

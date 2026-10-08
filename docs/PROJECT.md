@@ -10,6 +10,8 @@
 - Authoritative multiplayer gateway in `server/`: Node.js + `ws`, also serves `public/` for local testing or a single-service deployment.
 - The browser connects to the deployed gateway at `wss://spiesindisguise.onrender.com` through `window.SPIES_IN_DISGUISE_GATEWAY` in `public/config.js`. The legacy `SHADOW_CIRCUIT_GATEWAY` override remains accepted.
 - Rooms are ephemeral/in-memory, addressed by a six-character code. A private reconnect token is stored in local storage. No accounts or persistent personal data.
+- Online rooms begin in a server-authoritative lobby. Both connected players must mark ready; only the host can start, and hands are dealt at launch.
+- Browser room messages use protocol `2`; the server auto-starts protocol-1 rooms to keep cached pre-lobby clients compatible during rollout.
 
 ## Game rules
 Two players begin 12 spaces apart. Each turn the active player offers two different contacts, one openly and one concealed. The opponent takes either card; the active player gets the other. Recruiting the 1st/2nd/3rd copy applies that contact's corresponding movement. The first side whose combined progress closes the 12-space gap wins. Three Oracles wins instantly; three Renegades loses instantly. Active player wins simultaneous outcomes. Hands refill to four.
@@ -19,8 +21,9 @@ Two players begin 12 spaces apart. Each turn the active player offers two differ
 - Never send an opponent's hand or concealed offer card to a client.
 - Touch targets are at least 44px; primary play flow fits a narrow phone viewport.
 - Persistent Home/Play/Rules navigation is shared across screens; leaving an unfinished match requires confirmation.
+- Launch audio is synthesized with Web Audio after a user gesture; the mute preference is stored locally and reduced-motion is honored.
 - The 12-space pursuit is visualized as a circular signal ring; this is presentation only and does not alter movement or win calculations.
 - Keep visible copy concise and game-native.
 
 ## Current state
-Playable 1v1 PWA with persistent navigation, a mobile-first mode home, circular pursuit board, onboarding and rules, redesigned cards, offline Bot, pass-and-play, online rooms/reconnection, installation, offline caching, tested rules engines, and a live Render gateway.
+Playable 1v1 PWA with animated splash, optional sound, authoritative online lobbies, polished results, persistent navigation, circular board, onboarding, redesigned cards, offline Bot/pass-and-play, reconnection, installation, offline caching, tested rules, and a live Render gateway.

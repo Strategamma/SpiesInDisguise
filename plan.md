@@ -1,14 +1,14 @@
 # Goal
-Add clear, consistent navigation across home, setup, rules, and active game states.
+Ship a production-ready launch-to-lobby-to-game flow with polished feedback and finales.
 
 # Scope
-A persistent Home/Play/Rules navigation bar, meaningful active states, jump targets, and confirmation before abandoning an unfinished match.
+Launch experience, authoritative online lobby/readiness/start flow, synthesized audio, persistent mute control, gameplay transitions, and final result presentation. Preserve game rules.
 
 # Approach
-Render one shared bottom navigation from the app shell, route Play to the relevant section for the current screen, and use a native dialog to guard destructive Home navigation during active play.
+Gate launch behind one user gesture; add server-owned lobby state with ready flags and host start validation; synthesize short Web Audio cues; detect state transitions; add restrained CSS motion; render distinct finales.
 
 # Risks
-Fixed navigation covering mobile actions, duplicate rule controls, and accidentally discarding room or local-game state.
+Lobby reconnect/leave edge cases, unauthorized start attempts, browser audio restrictions, duplicate sounds during rerenders, excessive motion, and result effects obscuring mobile actions.
 
 # Verification
-Check navigation bindings and dialog actions, run rules and syntax tests, serve the UI, and attempt the required Playwright interaction flow while retaining the known macOS sandbox limitation.
+Test lobby join/ready/start authorization and privacy, existing rules, sound gating, syntax/server health, result branches, and attempt Playwright while retaining the known macOS sandbox limitation.

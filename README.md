@@ -32,5 +32,6 @@ Render's free service may sleep when idle, so the first connection can take a li
 ## Notes
 
 - No account or database is required.
+- Online rooms use a ready lobby; both players must be connected and ready before the host starts.
 - Share links use `?room=ABC123`; reconnect identity stays private in local storage.
 - This is an original game and does not include Agent Avenue branding or assets.

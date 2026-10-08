@@ -17,19 +17,36 @@ export function makeDeck(random = Math.random) {
   return deck;
 }
 
-export function newPlayer(name) {
-  return { name: String(name || "Agent").trim().slice(0, 18) || "Agent", token: token(), hand: [], collection: {}, progress: 0, socket: null, connected: true };
+export function newPlayer(name, protocol = 1) {
+  return { name: String(name || "Agent").trim().slice(0, 18) || "Agent", token: token(), hand: [], collection: {}, progress: 0, socket: null, connected: true, ready: false, protocol: Number(protocol) || 1 };
 }
 
 export function newRoom(code, host) {
-  const room = { code, players: [host], deck: makeDeck(), turn: 0, phase: "waiting", offer: null, winner: null, resultReason: "", updatedAt: Date.now(), rematchVotes: new Set() };
-  draw(room, host);
-  return room;
+  return { code, players: [host], deck: makeDeck(), turn: 0, phase: "lobby", offer: null, winner: null, resultReason: "", updatedAt: Date.now(), rematchVotes: new Set() };
 }
 
 export function addPlayer(room, player) {
+  if (room.phase !== "lobby") throw new Error("That match has already started.");
   if (room.players.length >= 2) throw new Error("That room is full.");
-  room.players.push(player); draw(room, player); room.phase = "offer"; room.updatedAt = Date.now();
+  room.players.push(player);
+  if (room.players.some(member => member.protocol < 2)) { room.players.forEach(member => draw(room, member)); room.phase = "offer"; }
+  room.updatedAt = Date.now();
+}
+
+export function setReady(room, playerIndex, ready) {
+  if (room.phase !== "lobby") throw new Error("The match has already started.");
+  const player = room.players[playerIndex];
+  if (!player) throw new Error("Player not found.");
+  player.ready = Boolean(ready); room.updatedAt = Date.now();
+}
+
+export function startGame(room, playerIndex) {
+  if (room.phase !== "lobby") throw new Error("The match has already started.");
+  if (playerIndex !== 0) throw new Error("Only the host can start the match.");
+  if (room.players.length !== 2) throw new Error("Two players are required.");
+  if (room.players.some(player => !player.connected || !player.ready)) throw new Error("Both players must be connected and ready.");
+  room.players.forEach(player => draw(room, player));
+  room.phase = "offer"; room.updatedAt = Date.now();
 }
 
 export function draw(room, player) { while (player.hand.length < 4 && room.deck.length) player.hand.push(room.deck.pop()); }
@@ -91,7 +108,8 @@ export function viewFor(room, you) {
   return {
     room: room.code, you, turn: room.turn, phase: room.phase, winner: room.winner, resultReason: room.resultReason,
     hand: room.players[you].hand,
-    players: room.players.map(p => ({ name: p.name, collection: p.collection, progress: p.progress, connected: p.connected })),
+    isHost: you === 0, rematchVotes: room.rematchVotes.size, youRematch: room.rematchVotes.has(you),
+    players: room.players.map(p => ({ name: p.name, collection: p.collection, progress: p.progress, connected: p.connected, ready: p.ready })),
     offer
   };
 }
