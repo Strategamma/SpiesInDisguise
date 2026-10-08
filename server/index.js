@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer, WebSocket } from "ws";
-import { addPlayer, chooseOffer, newPlayer, newRoom, restart, roomCode, setReady, startGame, submitOffer, viewFor } from "./game.js";
+import { addPlayer, chooseOffer, newPlayer, newRoom, restart, roomCode, setReady, startGame, submitOffer, swapCard, viewFor } from "./game.js";
 
 const root = join(fileURLToPath(new URL("..", import.meta.url)), "public");
 const rooms = new Map();
@@ -54,6 +54,7 @@ wss.on("connection", ws => {
         if (message.type === "ready") setReady(room, i, message.ready);
         else if (message.type === "start") startGame(room, i);
         else if (message.type === "offer") submitOffer(room, i, message.openId, message.hiddenId);
+        else if (message.type === "swap") swapCard(room, i, message.cardId);
         else if (message.type === "choose") {
           const offer = room.offer;
           chooseOffer(room, i, message.choice);

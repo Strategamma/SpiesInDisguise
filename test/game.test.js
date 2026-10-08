@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addPlayer, chooseOffer, newPlayer, newRoom, resolveWinner, setReady, startGame, submitOffer, viewFor } from "../server/game.js";
+import { addPlayer, chooseOffer, newPlayer, newRoom, resolveWinner, setReady, startGame, submitOffer, swapCard, viewFor } from "../server/game.js";
 
 function roomReady() { const a = newPlayer("A", 2); const room = newRoom("ABC123", a); addPlayer(room, newPlayer("B", 2)); setReady(room, 0, true); setReady(room, 1, true); startGame(room, 0); return room; }
 
@@ -52,6 +52,26 @@ test("movement is signed and either agent intercepts after gaining six spaces", 
 
   const reverse = roomReady(); reverse.players[1].progress = 6; resolveWinner(reverse, 1);
   assert.equal(reverse.winner, 1);
+});
+
+test("a player can exchange four cards before offering while the deck has cards", () => {
+  const room = roomReady();
+  for (let remaining = 3; remaining >= 0; remaining--) {
+    const oldId = room.players[0].hand[0].id;
+    swapCard(room, 0, oldId);
+    assert.equal(room.players[0].hand.length, 4);
+    assert.equal(room.players[0].swapsRemaining, remaining);
+    assert.ok(!room.players[0].hand.some(card => card.id === oldId));
+  }
+  assert.throws(() => swapCard(room, 0, room.players[0].hand[0].id), /No exchanges/);
+  assert.equal(viewFor(room, 0).swapsRemaining, 0);
+});
+
+test("an empty deck ends only when the next player cannot offer two cards", () => {
+  const room = roomReady(); room.deck = []; room.players[0].hand = []; room.players[1].hand = [{ id: "a", kind: "courier" }, { id: "b", kind: "ghost" }];
+  resolveWinner(room, 0); assert.equal(room.winner, null);
+  room.players[1].hand.pop(); resolveWinner(room, 0);
+  assert.notEqual(room.winner, null); assert.match(room.resultReason, /network ran dry/);
 });
 
 test("third Oracle wins and third Renegade loses", () => {

@@ -1,24 +1,25 @@
 import crypto from "node:crypto";
 
 export const CONTACTS = {
-  courier: [1, 2, 3], analyst: [-1, 2, 5], ghost: [2, -1, 4],
-  handler: [1, 3, 1], oracle: [0, 1, 2], renegade: [3, 4, -3]
+  courier: [1, 2, 3], analyst: [-1, 6, -1], ghost: [0, 2, 6],
+  handler: [-1, -1, -2], oracle: [0, 0, 0], renegade: [2, 3, 0],
+  insider: [4], sleeper: [-3]
 };
 
 const START_GAP = 6;
-const COPIES = 6;
+const COPIES = { courier: 6, analyst: 6, ghost: 6, handler: 6, oracle: 6, renegade: 6, insider: 1, sleeper: 1 };
 
 export function token() { return crypto.randomBytes(18).toString("base64url"); }
 export function roomCode() { return crypto.randomBytes(4).toString("base64url").replace(/[-_]/g, "X").slice(0, 6).toUpperCase(); }
 
 export function makeDeck(random = Math.random) {
-  const deck = Object.keys(CONTACTS).flatMap(kind => Array.from({ length: COPIES }, (_, i) => ({ id: `${kind}-${i}-${crypto.randomBytes(3).toString("hex")}`, kind })));
+  const deck = Object.keys(CONTACTS).flatMap(kind => Array.from({ length: COPIES[kind] }, (_, i) => ({ id: `${kind}-${i}-${crypto.randomBytes(3).toString("hex")}`, kind })));
   for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
   return deck;
 }
 
 export function newPlayer(name, protocol = 1) {
-  return { name: String(name || "Agent").trim().slice(0, 18) || "Agent", token: token(), hand: [], collection: {}, progress: 0, socket: null, connected: true, ready: false, protocol: Number(protocol) || 1 };
+  return { name: String(name || "Agent").trim().slice(0, 18) || "Agent", token: token(), hand: [], collection: {}, progress: 0, swapsRemaining: 4, socket: null, connected: true, ready: false, protocol: Number(protocol) || 1 };
 }
 
 export function newRoom(code, host) {
@@ -50,6 +51,17 @@ export function startGame(room, playerIndex) {
 }
 
 export function draw(room, player) { while (player.hand.length < 4 && room.deck.length) player.hand.push(room.deck.pop()); }
+
+export function swapCard(room, playerIndex, cardId) {
+  if (room.winner !== null || room.phase !== "offer" || room.turn !== playerIndex) throw new Error("You can only exchange before making your offer.");
+  const player = room.players[playerIndex];
+  if (player.swapsRemaining <= 0) throw new Error("No exchanges remain.");
+  if (!room.deck.length) throw new Error("The contact deck is empty.");
+  const card = player.hand.find(item => item.id === cardId);
+  if (!card) throw new Error("Choose a contact from your hand.");
+  player.hand = player.hand.filter(item => item.id !== cardId);
+  player.swapsRemaining -= 1; draw(room, player); room.updatedAt = Date.now();
+}
 
 export function submitOffer(room, playerIndex, openId, hiddenId) {
   if (room.winner !== null || room.phase !== "offer" || room.turn !== playerIndex) throw new Error("It isn’t time to offer cards.");
@@ -91,7 +103,7 @@ export function resolveWinner(room, active) {
     room.phase = "finished";
     return;
   }
-  if (!room.deck.length && room.players.some(p => p.hand.length < 2)) {
+  if (!room.deck.length && room.players[1 - active].hand.length < 2) {
     room.winner = room.players[0].progress === room.players[1].progress ? active : (room.players[0].progress > room.players[1].progress ? 0 : 1);
     room.resultReason = "The network ran dry; the closest pursuer wins."; room.phase = "finished";
   }
@@ -99,7 +111,7 @@ export function resolveWinner(room, active) {
 
 export function restart(room) {
   room.deck = makeDeck(); room.turn = 1 - room.turn; room.phase = "offer"; room.offer = null; room.winner = null; room.resultReason = ""; room.rematchVotes.clear();
-  for (const p of room.players) { p.hand = []; p.collection = {}; p.progress = 0; draw(room, p); }
+  for (const p of room.players) { p.hand = []; p.collection = {}; p.progress = 0; p.swapsRemaining = 4; draw(room, p); }
   room.updatedAt = Date.now();
 }
 
@@ -107,7 +119,7 @@ export function viewFor(room, you) {
   const offer = room.offer ? { open: room.offer.open, by: room.offer.by } : null;
   return {
     room: room.code, you, turn: room.turn, phase: room.phase, winner: room.winner, resultReason: room.resultReason,
-    hand: room.players[you].hand,
+    hand: room.players[you].hand, swapsRemaining: room.players[you].swapsRemaining, deckRemaining: room.deck.length,
     isHost: you === 0, rematchVotes: room.rematchVotes.size, youRematch: room.rematchVotes.has(you),
     players: room.players.map(p => ({ name: p.name, collection: p.collection, progress: p.progress, connected: p.connected, ready: p.ready })),
     offer

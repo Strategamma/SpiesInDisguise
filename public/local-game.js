@@ -1,17 +1,20 @@
 export const LOCAL_CONTACTS = {
-  courier: [1, 2, 3], analyst: [-1, 2, 5], ghost: [2, -1, 4],
-  handler: [1, 3, 1], oracle: [0, 1, 2], renegade: [3, 4, -3]
+  courier: [1, 2, 3], analyst: [-1, 6, -1], ghost: [0, 2, 6],
+  handler: [-1, -1, -2], oracle: [0, 0, 0], renegade: [2, 3, 0],
+  insider: [4], sleeper: [-3]
 };
+
+const COPIES = { courier: 6, analyst: 6, ghost: 6, handler: 6, oracle: 6, renegade: 6, insider: 1, sleeper: 1 };
 
 const START_GAP = 6;
 
 function makeDeck(random = Math.random) {
-  const deck = Object.keys(LOCAL_CONTACTS).flatMap(kind => Array.from({ length: 6 }, (_, i) => ({ id: `${kind}-${i}-${Math.floor(random() * 1e9).toString(36)}`, kind })));
+  const deck = Object.keys(LOCAL_CONTACTS).flatMap(kind => Array.from({ length: COPIES[kind] }, (_, i) => ({ id: `${kind}-${i}-${Math.floor(random() * 1e9).toString(36)}`, kind })));
   for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
   return deck;
 }
 
-function player(name) { return { name, hand: [], collection: {}, progress: 0, connected: true }; }
+function player(name) { return { name, hand: [], collection: {}, progress: 0, swapsRemaining: 4, connected: true }; }
 function draw(game, target) { while (target.hand.length < 4 && game.deck.length) target.hand.push(game.deck.pop()); }
 
 export function createLocalGame(mode, humanName = "Agent", random = Math.random) {
@@ -29,6 +32,17 @@ export function localOffer(game, playerIndex, openId, hiddenId) {
   if (open.kind === hidden.kind && active.hand.some(c => c.kind !== open.kind)) throw new Error("The two contacts must be different.");
   active.hand = active.hand.filter(c => c.id !== openId && c.id !== hiddenId);
   draw(game, active); game.offer = { open, hidden, by: playerIndex }; game.phase = "choose";
+}
+
+export function localSwap(game, playerIndex, cardId) {
+  if (game.winner !== null || game.phase !== "offer" || game.turn !== playerIndex) throw new Error("You can only exchange before making your offer.");
+  const active = game.players[playerIndex];
+  if (active.swapsRemaining <= 0) throw new Error("No exchanges remain.");
+  if (!game.deck.length) throw new Error("The contact deck is empty.");
+  const card = active.hand.find(item => item.id === cardId);
+  if (!card) throw new Error("Choose a contact from your hand.");
+  active.hand = active.hand.filter(item => item.id !== cardId);
+  active.swapsRemaining -= 1; draw(game, active);
 }
 
 function recruit(target, card) {
@@ -55,14 +69,14 @@ function resolve(game, active) {
     game.winner = candidates.length === 2 ? active : candidates[0]; game.phase = "finished";
     const winner = game.players[game.winner];
     game.resultReason = (winner.collection.oracle || 0) >= 3 ? "Three Oracles exposed the rival network." : loses[1 - game.winner] ? "The rival recruited a third Renegade." : "The rival was caught on the 12-space loop.";
-  } else if (!game.deck.length && game.players.some(p => p.hand.length < 2)) {
+  } else if (!game.deck.length && game.players[1 - active].hand.length < 2) {
     game.winner = game.players[0].progress === game.players[1].progress ? active : (game.players[0].progress > game.players[1].progress ? 0 : 1);
     game.resultReason = "The network ran dry; the closest pursuer wins."; game.phase = "finished";
   }
 }
 
 export function localView(game, you) {
-  return { room: game.room, mode: game.mode, you, turn: game.turn, phase: game.phase, winner: game.winner, resultReason: game.resultReason, hand: game.players[you].hand, players: game.players.map(p => ({ name: p.name, collection: p.collection, progress: p.progress, connected: true })), offer: game.offer ? { open: game.offer.open, by: game.offer.by } : null };
+  return { room: game.room, mode: game.mode, you, turn: game.turn, phase: game.phase, winner: game.winner, resultReason: game.resultReason, hand: game.players[you].hand, swapsRemaining: game.players[you].swapsRemaining, deckRemaining: game.deck.length, players: game.players.map(p => ({ name: p.name, collection: p.collection, progress: p.progress, connected: true })), offer: game.offer ? { open: game.offer.open, by: game.offer.by } : null };
 }
 
 function cardValue(game, playerIndex, card) {

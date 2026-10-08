@@ -1,13 +1,15 @@
-import { chooseBotCard, chooseBotOffer, createLocalGame, localChoose, localOffer, localView } from "./local-game.js";
+import { chooseBotCard, chooseBotOffer, createLocalGame, localChoose, localOffer, localSwap, localView } from "./local-game.js";
 import { BOARD_SPACES, boardPosition, interceptionGap, nextRecruitIndex } from "./ui-logic.js";
 
 const CONTACTS = {
   courier: { name: "Courier", symbol: "◈", moves: [1, 2, 3], note: "Reliable progress with every recruit." },
-  analyst: { name: "Analyst", symbol: "⌁", moves: [-1, 2, 5], note: "Starts slowly, then makes a breakthrough." },
-  ghost: { name: "Ghost", symbol: "◌", moves: [2, -1, 4], note: "Fast, elusive, and hard to predict." },
-  handler: { name: "Handler", symbol: "⌘", moves: [1, 3, 1], note: "Most effective on the second recruit." },
-  oracle: { name: "Oracle", symbol: "◇", moves: [0, 1, 2], note: "Recruit three to win immediately." },
-  renegade: { name: "Renegade", symbol: "✕", moves: [3, 4, -3], note: "Powerful bait—three makes you lose." }
+  analyst: { name: "Analyst", symbol: "⌁", moves: [-1, 6, -1], note: "A risky first recruit with a huge second payoff." },
+  ghost: { name: "Ghost", symbol: "◌", moves: [0, 2, 6], note: "Quiet at first, decisive as the network grows." },
+  handler: { name: "Handler", symbol: "⌘", moves: [-1, -1, -2], note: "Always pulls its recruiter backward." },
+  oracle: { name: "Oracle", symbol: "◇", moves: [0, 0, 0], note: "Recruit three to win at the end of the turn." },
+  renegade: { name: "Renegade", symbol: "✕", moves: [2, 3, 0], note: "Fast early—recruiting three makes you lose." },
+  insider: { name: "Insider", symbol: "↑", moves: [4], note: "A unique contact that moves four spaces forward.", single: true },
+  sleeper: { name: "Sleeper", symbol: "↓", moves: [-3], note: "A unique contact that moves three spaces backward.", single: true }
 };
 
 const app = document.querySelector("#app");
@@ -19,6 +21,7 @@ let state = null;
 let connected = false;
 let selected = [];
 let faceUpId = null;
+let swapMode = false;
 let pendingRoom = params.get("room")?.toUpperCase() || "";
 let playMode = pendingRoom ? "wifi" : null;
 let localGame = null;
@@ -141,6 +144,7 @@ function connect() {
       if (revealState) queueAfterReveal(message.state); else applyState(message.state);
       selected = [];
       faceUpId = null;
+      swapMode = false;
       localStorage.setItem(`spies-token-${state.room}`, message.token);
       history.replaceState({}, "", `${location.pathname}?room=${state.room}`);
       render();
@@ -175,7 +179,20 @@ function leaveDialog() {
 }
 
 function rulesDialog() {
-  return `<dialog id="rules" class="rules-dialog"><div class="dialog-head"><div><span class="eyebrow">Field briefing</span><h2>How to play</h2></div><button class="dialog-close" data-close-rules aria-label="Close rules">×</button></div><p class="rules-intro">Bluff with two contacts, read your rival, and catch them on the loop.</p><div class="rule-steps"><article><span>1</span><div><b>Send two signals</b><p>Choose two different contacts. Show one face-up and keep the other concealed.</p></div></article><article><span>2</span><div><b>Your rival chooses</b><p>They recruit the contact they take. You recruit the one they leave behind.</p></div></article><article><span>3</span><div><b>Chase clockwise</b><p>Both agents move in the same direction around 12 spaces. You begin six spaces apart.</p></div></article></div><div class="win-conditions"><div><span>◆</span><p><b>Catch your rival</b>Gain six spaces on the other agent to intercept them.</p></div><div><span>◇</span><p><b>Oracle shortcut</b>Recruit three Oracles to win immediately.</p></div><div class="danger"><span>✕</span><p><b>Avoid exposure</b>A third Renegade makes you lose immediately.</p></div></div><h3 class="dossier-title">Contact dossier</h3><div class="legend">${Object.entries(CONTACTS).map(([kind, c]) => `<div class="legend-item contact-${kind}"><div class="legend-symbol">${c.symbol}</div><div><b>${c.name}</b><span>${c.note}</span><div class="mini-moves">${c.moves.map((n, i) => `<span><small>${i + 1}${i === 0 ? "st" : i === 1 ? "nd" : "rd"}</small>${n > 0 ? "+" : ""}${n}</span>`).join("")}</div></div></div>`).join("")}</div><button class="primary rules-done" data-close-rules>Start playing</button></dialog>`;
+  const dossier = Object.entries(CONTACTS).map(([kind, contact]) => `<div class="legend-item contact-${kind}"><div class="legend-symbol">${contact.symbol}</div><div><b>${contact.name}</b><span>${contact.note}</span><div class="mini-moves">${contact.moves.map((movement, index) => `<span><small>${contact.single ? "Always" : `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`}</small>${movement > 0 ? "+" : ""}${movement}</span>`).join("")}</div></div></div>`).join("");
+  return `<dialog id="rules" class="rules-dialog">
+    <div class="dialog-head"><div><span class="eyebrow">Field briefing</span><h2>How to play</h2></div><button class="dialog-close" data-close-rules aria-label="Close rules">×</button></div>
+    <p class="rules-intro">Bluff with two contacts, read your rival, and catch them on the loop.</p>
+    <div class="rule-steps">
+      <article><span>1</span><div><b>Prepare your offer</b><p>Before offering, you may exchange contacts face down—up to four times per game while the deck has cards. Then play two different contacts: one revealed and one concealed. If every card in your hand matches, you may play a pair.</p></div></article>
+      <article><span>2</span><div><b>Your rival chooses</b><p>They recruit one contact and you recruit the other. Both identities are then revealed.</p></div></article>
+      <article><span>3</span><div><b>Move together</b><p>Apply each newly recruited contact’s 1st, 2nd, or 3rd effect, then move both agents. Negative movement goes counterclockwise; the 3rd effect also applies to every later copy.</p></div></article>
+      <article><span>4</span><div><b>Resolve the end step</b><p>Only after both agents finish moving, check every win and loss condition. If outcomes tie, the player who made the offer wins.</p></div></article>
+    </div>
+    <div class="win-conditions"><div><span>◆</span><p><b>Catch your rival</b>Reach or pass them on the 12-space loop.</p></div><div><span>◇</span><p><b>Oracle shortcut</b>Recruit three Oracles to win.</p></div><div class="danger"><span>✕</span><p><b>Avoid exposure</b>A third Renegade makes you lose.</p></div></div>
+    <p class="rules-note"><b>Empty deck:</b> Keep playing without drawing or exchanging. If the next player cannot offer two cards, whoever is closer to catching the rival wins; the offering player wins an exact tie.</p>
+    <h3 class="dossier-title">Contact dossier</h3><div class="legend">${dossier}</div><button class="primary rules-done" data-close-rules>Start playing</button>
+  </dialog>`;
 }
 
 function installDialog() {
@@ -235,7 +252,7 @@ function returnHome() {
   clearTimeout(revealTimer); revealTimer = null; revealState = null; pendingRevealState = null; revealComplete = null;
   if (playMode === "wifi" && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "leave" }));
   playMode = null; localGame = null; state = null; localHandoff = false; pendingRoom = ""; homePanel = null;
-  selected = []; faceUpId = null;
+  selected = []; faceUpId = null; swapMode = false;
   history.replaceState({}, "", location.pathname);
   renderHome();
 }
@@ -261,7 +278,7 @@ function startLocal(mode) {
   clearTimeout(botTimer);
   landscapePromptDismissed = false;
   preferLandscape();
-  selected = []; faceUpId = null;
+  selected = []; faceUpId = null; swapMode = false;
   playMode = mode;
   const name = localStorage.getItem("spies-name") || localStorage.getItem("shadow-name") || "Player One";
   localGame = createLocalGame(mode, name);
@@ -284,6 +301,9 @@ function localAction(type, payload = {}) {
       const next = localView(localGame, state.you);
       startReveal({ type: "reveal", choice: payload.choice, chosen: offer[payload.choice], other: offer[payload.choice === "open" ? "hidden" : "open"], chooser });
       queueAfterReveal(next);
+    } else if (type === "swap") {
+      localSwap(localGame, state.you, payload.cardId);
+      applyState(localView(localGame, state.you)); render();
     } else if (type === "rematch") startLocal(playMode);
   } catch (error) { showToast(error.message); }
 }
@@ -324,7 +344,7 @@ function cardHtml(card, options = {}) {
   const recruitIndex = nextRecruitIndex(state.players, playerIndex, card.kind);
   const tag = options.static ? "div" : "button";
   const interaction = options.static ? "" : `${options.attr || ""} data-card="${card.id}" aria-pressed="${selected.includes(card.id)}"`;
-  return `<${tag} class="card contact-${card.kind}${selectedClass}${isOpen ? " face-up" : ""}${options.static ? " static-card" : ""}" ${interaction}><div class="card-top"><span class="card-symbol">${c.symbol}</span>${isOpen ? `<span class="open-badge">Revealed</span>` : `<span class="contact-type">Contact</span>`}</div><div class="card-name">${c.name}</div><div class="card-effect">${c.note}</div><div class="card-moves" aria-label="Movement on first, second, and third recruit">${c.moves.map((n, i) => `<span class="move ${i === recruitIndex ? "next-move" : ""}" ${i === recruitIndex ? 'aria-current="step"' : ""}><small>${i + 1}${i === 0 ? "st" : i === 1 ? "nd" : "rd"}</small><b>${n > 0 ? "+" : ""}${n}</b>${i === recruitIndex ? "<em>Next</em>" : ""}</span>`).join("")}</div>${selected.includes(card.id) ? `<span class="selected-mark">${isOpen ? "Shown" : "Selected"}</span>` : ""}</${tag}>`;
+  return `<${tag} class="card contact-${card.kind}${selectedClass}${isOpen ? " face-up" : ""}${options.static ? " static-card" : ""}" ${interaction}><div class="card-top"><span class="card-symbol">${c.symbol}</span>${isOpen ? `<span class="open-badge">Revealed</span>` : `<span class="contact-type">${c.single ? "Unique" : "Contact"}</span>`}</div><div class="card-name">${c.name}</div><div class="card-effect">${c.note}</div><div class="card-moves ${c.single ? "single-move" : ""}" aria-label="${c.single ? "Fixed movement" : "Movement on first, second, and third recruit"}">${c.moves.map((n, i) => `<span class="move ${i === recruitIndex ? "next-move" : ""}" ${i === recruitIndex ? 'aria-current="step"' : ""}><small>${c.single ? "Always" : `${i + 1}${i === 0 ? "st" : i === 1 ? "nd" : "rd"}`}</small><b>${n > 0 ? "+" : ""}${n}</b>${i === recruitIndex ? "<em>Next</em>" : ""}</span>`).join("")}</div>${selected.includes(card.id) ? `<span class="selected-mark">${isOpen ? "Shown" : "Selected"}</span>` : ""}</${tag}>`;
 }
 
 function revealCardHtml(card, wasHidden, recipient) {
@@ -398,7 +418,11 @@ function renderGame() {
   } else if (waitingForRival) {
     playArea = `<div class="stage"><span class="turn-pill waiting-pill">Offer sent</span><h2>Your rival is choosing</h2><p>The concealed contact stays secret until they decide.</p></div><div class="offer">${cardHtml(state.offer.open, { static: true, playerIndex: 1 - state.you })}${cardHtml(null, { concealed: true, static: true })}</div>`;
   } else if (active) {
-    playArea = `<div class="stage"><span class="turn-pill">Your turn</span><h2>Build your offer</h2><p>${selected.length < 2 ? "Choose two different contacts." : faceUpId ? "Ready—send one revealed and one concealed." : "Now tap either selected card to reveal it."}</p></div><div class="hand-label"><span>Your hand</span><span>${selected.length}/2 chosen</span></div><div class="hand">${state.hand.map(card => cardHtml(card)).join("")}</div><div class="action-bar"><p class="selection-hint">${selected.length < 2 ? "Step 1 · Choose two contacts" : faceUpId ? `Revealing ${CONTACTS[state.hand.find(c => c.id === faceUpId).kind].name}` : "Step 2 · Choose which card to reveal"}</p><button class="primary" id="offer" ${selected.length === 2 && faceUpId ? "" : "disabled"}>Send this offer</button></div>`;
+    const swaps = state.swapsRemaining ?? 0;
+    const canSwap = swaps > 0 && state.deckRemaining > 0 && selected.length === 0;
+    const instruction = swapMode ? "Tap one contact to exchange it face down." : selected.length < 2 ? "Choose two different contacts." : faceUpId ? "Ready—send one revealed and one concealed." : "Now tap either selected card to reveal it.";
+    const hint = swapMode ? `Exchange available · ${swaps} remaining` : selected.length < 2 ? "Step 1 · Choose two contacts" : faceUpId ? `Revealing ${CONTACTS[state.hand.find(c => c.id === faceUpId).kind].name}` : "Step 2 · Choose which card to reveal";
+    playArea = `<div class="stage"><span class="turn-pill">Your turn</span><h2>${swapMode ? "Exchange a contact" : "Build your offer"}</h2><p>${instruction}</p></div><div class="hand-label"><span>Your hand</span><span>${swapMode ? `${swaps}/4 exchanges left` : `${selected.length}/2 chosen`}</span></div><div class="hand ${swapMode ? "swap-mode" : ""}">${state.hand.map(card => cardHtml(card)).join("")}</div><div class="action-bar"><p class="selection-hint">${hint}</p><div class="action-buttons"><button class="secondary" id="swap-card" ${swapMode || canSwap ? "" : "disabled"}>${swapMode ? "Cancel exchange" : `Exchange · ${swaps} left`}</button><button class="primary" id="offer" ${!swapMode && selected.length === 2 && faceUpId ? "" : "disabled"}>Send this offer</button></div></div>`;
   } else {
     playArea = `<div class="panel waiting"><div class="signal"></div><h2>${escapeHtml(state.players[state.turn].name)} is preparing an offer</h2><p class="lede">Watch their network. The card they need may be the one they show you.</p></div>`;
   }
@@ -422,11 +446,13 @@ function renderGame() {
   document.querySelector("#start-match")?.addEventListener("click", () => { playSound("start"); send("start"); });
   document.querySelectorAll(".hand .card").forEach(el => el.addEventListener("click", () => selectCard(el.dataset.card)));
   document.querySelector("#offer")?.addEventListener("click", () => { playSound("offer"); send("offer", { openId: faceUpId, hiddenId: selected.find(id => id !== faceUpId) }); });
+  document.querySelector("#swap-card")?.addEventListener("click", () => { swapMode = !swapMode; selected = []; faceUpId = null; playSound("tap"); renderGame(); });
   document.querySelectorAll("[data-choice]").forEach(el => el.addEventListener("click", () => { playSound("select"); send("choose", { choice: el.dataset.choice }); }));
 }
 
 function selectCard(id) {
   const card = state.hand.find(item => item.id === id);
+  if (swapMode) { swapMode = false; playSound("select"); return send("swap", { cardId: id }); }
   if (selected.includes(id)) {
     if (selected.length === 2) faceUpId = id;
     else { selected = selected.filter(item => item !== id); faceUpId = null; }
@@ -450,7 +476,7 @@ async function shareRoom() {
 }
 
 function render() { splashVisible ? renderSplash() : state ? renderGame() : renderHome(); }
-window.render_game_to_text = () => JSON.stringify(splashVisible ? { screen: "splash", soundEnabled, connected } : state ? { screen: revealState ? "reveal" : state.phase === "lobby" ? "lobby" : state.winner !== null ? "result" : "game", mode: playMode, you: state.you, turn: state.turn, phase: state.phase, winner: state.winner, selected, revealed: faceUpId, resolving: revealState ? { choice: revealState.choice, chosen: revealState.chosen.kind, other: revealState.other.kind, chooser: revealState.chooser } : null, hand: state.hand?.map(card => ({ id: card.id, kind: card.kind })), offer: state.offer ? { open: state.offer.open?.kind, concealed: true } : null, players: state.players.map(player => ({ name: player.name, progress: player.progress, collection: player.collection, connected: player.connected, ready: player.ready })) } : { screen: "home", panel: homePanel, connected, soundEnabled });
+window.render_game_to_text = () => JSON.stringify(splashVisible ? { screen: "splash", soundEnabled, connected } : state ? { screen: revealState ? "reveal" : state.phase === "lobby" ? "lobby" : state.winner !== null ? "result" : "game", mode: playMode, you: state.you, turn: state.turn, phase: state.phase, winner: state.winner, selected, revealed: faceUpId, exchangeMode: swapMode, exchangesRemaining: state.swapsRemaining, deckRemaining: state.deckRemaining, resolving: revealState ? { choice: revealState.choice, chosen: revealState.chosen.kind, other: revealState.other.kind, chooser: revealState.chooser } : null, hand: state.hand?.map(card => ({ id: card.id, kind: card.kind })), offer: state.offer ? { open: state.offer.open?.kind, concealed: true } : null, players: state.players.map(player => ({ name: player.name, progress: player.progress, collection: player.collection, connected: player.connected, ready: player.ready })) } : { screen: "home", panel: homePanel, connected, soundEnabled });
 window.advanceTime = () => {};
 addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; render(); });
 addEventListener("appinstalled", () => { installPrompt = null; render(); showToast("Spies in Disguise installed"); });

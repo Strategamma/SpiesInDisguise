@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chooseBotCard, chooseBotOffer, createLocalGame, localChoose, localOffer, localView } from "../public/local-game.js";
+import { chooseBotCard, chooseBotOffer, createLocalGame, localChoose, localOffer, localSwap, localView } from "../public/local-game.js";
 
 test("local pass-and-play keeps the concealed contact out of the view", () => {
   const game = createLocalGame("local", "One", () => .4);
@@ -27,4 +27,15 @@ test("local chase uses the same six-space relative interception rule", () => {
   assert.equal(game.players[0].progress, 6);
   assert.equal(game.winner, 0);
   assert.match(game.resultReason, /12-space loop/);
+});
+
+test("local exchanges preserve hand size and enforce the four-card limit", () => {
+  const game = createLocalGame("local", "One", () => .35);
+  for (let remaining = 3; remaining >= 0; remaining--) {
+    localSwap(game, 0, game.players[0].hand[0].id);
+    assert.equal(game.players[0].hand.length, 4);
+    assert.equal(game.players[0].swapsRemaining, remaining);
+  }
+  assert.throws(() => localSwap(game, 0, game.players[0].hand[0].id), /No exchanges/);
+  assert.equal(localView(game, 0).swapsRemaining, 0);
 });

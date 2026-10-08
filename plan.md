@@ -1,14 +1,14 @@
 # Goal
-Change the pursuit board to a 12-space clockwise chase with a six-space starting gap, and prefer landscape orientation during mobile matches.
+Bring the two-player base game into mechanical parity with the referenced simple-mode rulebook while preserving original Spies in Disguise branding and assets.
 
 # Scope
-Authoritative and local win math, signed movement, board geometry/copy, rules/onboarding, mobile landscape PWA preference, rotate guidance, responsive landscape styling, tests, and offline cache.
+Audit setup, hand refill, offer restrictions, optional four-use card exchange, recruit/movement timing, end-step win/loss ties, deck exhaustion, rules UI, bot/local/online parity, tests, and cache. Advanced market cards and 3–4-player teams remain separate modes outside the current two-player scope.
 
 # Approach
-Track each agent's cumulative signed movement. Place them at indices 0 and 6 on one 12-node clockwise loop; both add movement in the same direction. Intercept when either agent gains six relative spaces. Request landscape after a game-start gesture, declare it in the manifest, and show rotate guidance when a mobile browser cannot lock orientation.
+Use the publisher rulebook as the behavioral reference, map its generic mechanics onto original contacts, and keep server/local engines identical. Add a server-authoritative exchange action and expose only the counts needed by the UI. Resolve all movement and conditions at the End step.
 
 # Risks
-Server/local rule drift, negative movement being incorrectly clamped, stale clients visualizing the old board, orientation locking being unsupported outside installed/fullscreen contexts, and short landscape viewports crowding controls.
+Exchange exploits outside the Play step, deck-empty off-by-one behavior, information leakage, local/server drift, stale clients sending unsupported actions, and copying protected names/art/copy instead of only interoperable mechanics.
 
 # Verification
-Test clockwise positions, initial gap, both interception directions, negative movement, Oracle/Renegade outcomes, server/local parity, manifest validity, syntax/build/server assets, landscape CSS, and attempt Playwright under the known sandbox limitation.
+Test exchange legality/counts, hand refill, identical-card exception, signed simultaneous movement, all tie combinations, next-player deck exhaustion, server/local parity, syntax/server/cache, and attempt Playwright under the known sandbox limitation.
