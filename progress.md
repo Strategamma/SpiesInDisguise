@@ -23,3 +23,10 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 - Added authoritative post-choice reveal events, concealed-card flip, card transfer animation, and reveal sound for online, bot, and pass-and-play games.
 - Verified online privacy and ordering with two WebSocket clients: hidden identity absent before choice, reveal received before state, identities correct, and recruitment applied.
 - Added a focused stage-calculation test. Playwright visual QA remains blocked by macOS sandbox Mach-port permission denial; manual device preview is still required.
+
+## 2026-10-08 — Full interface refinement
+- Audited the supplied desktop capture and all shared screen components. The main issues were oversized mode cards, detached affordances, badge/title competition, a visually heavy tutorial panel, low secondary-text contrast, and an over-dominant bottom dock.
+- Compacted and normalized home modes, onboarding, navigation, setup forms, game panels, lobby, cards, dialogs, collections, reveal, and result states across 320px mobile through desktop layouts.
+- Increased muted-text contrast, strengthened focus/hover/pressed feedback, protected sticky controls from the bottom dock, and bumped the offline cache to v4.
+- Fixed inert waiting-state cards so they no longer send invalid choices, and synchronized the Rules navigation item with the dialog's visual and accessible state.
+- Eight automated tests, syntax, CSS balance, local server, and static asset checks pass. Playwright remains blocked before launch by the macOS Mach-port sandbox restriction, so no automated screenshots were produced.

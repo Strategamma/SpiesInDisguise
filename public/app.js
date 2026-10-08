@@ -185,8 +185,14 @@ function installDialog() {
 function isInstalled() { return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; }
 
 function bindCommon() {
-  document.querySelectorAll("[data-rules]").forEach(button => button.addEventListener("click", () => { playSound("tap"); document.querySelector("#rules").showModal(); }));
-  document.querySelectorAll("[data-close-rules]").forEach(button => button.addEventListener("click", () => document.querySelector("#rules").close()));
+  const rules = document.querySelector("#rules");
+  const syncNavigation = () => {
+    document.querySelectorAll(".nav-button").forEach(button => button.removeAttribute("aria-current"));
+    document.querySelector(rules?.open ? ".nav-button[data-rules]" : state ? ".nav-button[data-play]" : ".nav-button[data-home]")?.setAttribute("aria-current", "page");
+  };
+  document.querySelectorAll("[data-rules]").forEach(button => button.addEventListener("click", () => { playSound("tap"); rules.showModal(); syncNavigation(); }));
+  document.querySelectorAll("[data-close-rules]").forEach(button => button.addEventListener("click", () => rules.close()));
+  rules?.addEventListener("close", syncNavigation);
   document.querySelector("[data-install]")?.addEventListener("click", installApp);
   document.querySelector("[data-sound]")?.addEventListener("click", toggleSound);
   document.querySelector("[data-close-install]")?.addEventListener("click", () => document.querySelector("#install-dialog").close());
@@ -298,7 +304,11 @@ function scheduleBotOffer() {
 }
 
 function cardHtml(card, options = {}) {
-  if (options.concealed) return `<button class="card concealed" data-choice="hidden" aria-label="Choose concealed contact"><div class="card-back-mark">?</div><div class="card-name">Unknown contact</div><div class="card-effect">Choose to reveal and recruit this agent.</div><span class="card-choice">Choose concealed</span></button>`;
+  if (options.concealed) {
+    const tag = options.static ? "div" : "button";
+    const interaction = options.static ? "" : 'data-choice="hidden" aria-label="Choose concealed contact"';
+    return `<${tag} class="card concealed${options.static ? " static-card" : ""}" ${interaction}><div class="card-back-mark">?</div><div class="card-name">Unknown contact</div><div class="card-effect">${options.static ? "Identity hidden until the decision is made." : "Choose to reveal and recruit this agent."}</div><span class="card-choice">${options.static ? "Concealed" : "Choose concealed"}</span></${tag}>`;
+  }
   const c = CONTACTS[card.kind];
   const selectedClass = selected.includes(card.id) ? " selected" : "";
   const isOpen = faceUpId === card.id;
@@ -376,7 +386,7 @@ function renderGame() {
   } else if (choosing) {
     playArea = `<div class="stage"><span class="turn-pill">Your decision</span><h2>Which contact do you take?</h2><p>You recruit your choice. Your rival gets the other card.</p></div><div class="offer">${cardHtml(state.offer.open, { attr: 'data-choice="open"' })}${cardHtml(null, { concealed: true })}</div>`;
   } else if (waitingForRival) {
-    playArea = `<div class="stage"><span class="turn-pill waiting-pill">Offer sent</span><h2>Your rival is choosing</h2><p>The concealed contact stays secret until they decide.</p></div><div class="offer">${cardHtml(state.offer.open)}${cardHtml(null, { concealed: true })}</div>`;
+    playArea = `<div class="stage"><span class="turn-pill waiting-pill">Offer sent</span><h2>Your rival is choosing</h2><p>The concealed contact stays secret until they decide.</p></div><div class="offer">${cardHtml(state.offer.open, { static: true, playerIndex: 1 - state.you })}${cardHtml(null, { concealed: true, static: true })}</div>`;
   } else if (active) {
     playArea = `<div class="stage"><span class="turn-pill">Your turn</span><h2>Build your offer</h2><p>${selected.length < 2 ? "Choose two different contacts." : faceUpId ? "Ready—send one revealed and one concealed." : "Now tap either selected card to reveal it."}</p></div><div class="hand-label"><span>Your hand</span><span>${selected.length}/2 chosen</span></div><div class="hand">${state.hand.map(card => cardHtml(card)).join("")}</div><div class="action-bar"><p class="selection-hint">${selected.length < 2 ? "Step 1 · Choose two contacts" : faceUpId ? `Revealing ${CONTACTS[state.hand.find(c => c.id === faceUpId).kind].name}` : "Step 2 · Choose which card to reveal"}</p><button class="primary" id="offer" ${selected.length === 2 && faceUpId ? "" : "disabled"}>Send this offer</button></div>`;
   } else {

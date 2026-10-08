@@ -22,3 +22,8 @@
 - Each visible contact card highlights the exact 1st, 2nd, or 3rd recruitment effect that its recipient would trigger next. Use the gold movement cell and mint `Next` label consistently.
 - A concealed identity remains visually and structurally hidden until a choice is accepted. Then flip the concealed card and animate both cards toward their recipients before applying the new board state.
 - Reveal timing should feel deliberate without delaying play; reduced-motion users receive an abbreviated, non-spatial transition.
+
+# Interface density
+- Mode cards are compact decision rows on every viewport: icon, title/context, then a clearly aligned affordance. Recommendations must never compete with the title.
+- The persistent navigation uses a restrained tinted active state; primary game actions, not navigation chrome, carry the strongest filled treatment.
+- Secondary information uses higher-contrast muted text, while panels rely on spacing and thin borders instead of oversized empty areas.
