@@ -7,3 +7,6 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 - Syntax and all five rules tests pass. Added concise `render_game_to_text` and time-step hooks for game-state QA.
 - Screenshot runner could not launch Chromium because macOS denied its Mach rendezvous service inside the execution sandbox. No screenshot was produced; do not claim visual QA completed.
 - TODO: visually check home, rules dialog, and bot hand at 320–430px when browser execution is available; verify there are no overflow or sticky-action issues.
+- Replaced the linear track with a circular 24-node signal ring. The active half represents the same 12-space gap; agents converge at the top interception point when combined progress reaches 12.
+- Updated rules and onboarding copy to describe the ring and interception objective. Game math remains unchanged.
+- Verified all marker coordinates remain within the ring and all 13 combined-progress winning splits converge. The Playwright retry was again blocked before launch by macOS Mach service permissions, so circular-board screenshot inspection remains pending.
