@@ -1,14 +1,14 @@
 # Goal
-Publish the static PWA from `public/` through GitHub Pages.
+Make the game UI clean, mobile-first, self-explanatory, and improve the visual/readability design of playable cards.
 
 # Scope
-Add the minimal GitHub Actions Pages workflow and preserve the existing Render gateway deployment.
+Home onboarding, a dedicated How to Play section, gameplay hierarchy, card components, responsive styling, and accessibility states. Preserve game rules and networking.
 
 # Approach
-Upload `public/` as the Pages artifact and deploy it on pushes to `main`; keep relative PWA asset paths compatible with the `/SpiesInDisguise/` subpath.
+Use progressive disclosure on the home screen, concise three-step rules with win conditions, clearer turn prompts, and cards with distinct contact color, icon, effect, and numbered recruitment movement track.
 
 # Risks
-The repository owner must select GitHub Actions as the Pages source once; publishing can take several minutes.
+Dense card information on narrow screens, concealed-information leakage, and regressions in selection or pass-and-play flows.
 
 # Verification
-Validate the workflow, relative asset paths, automated tests, and the live Pages URL after GitHub deploys it.
+Run rules tests and syntax checks; exercise home, rules, bot setup, selection, offer, and responsive layouts with Playwright; inspect screenshots and console errors.

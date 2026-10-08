@@ -21,4 +21,4 @@ Two players begin 12 spaces apart. Each turn the active player offers two differ
 - Keep visible copy concise and game-native.
 
 ## Current state
-Playable 1v1 PWA with a Decadence-style mode home, offline Bot, pass-and-play handoffs, online room links/reconnection, install guidance, offline shell caching, tested rules engines, and a live Render gateway.
+Playable 1v1 PWA with a mobile-first mode home, visible onboarding and full rules briefing, redesigned contact cards, offline Bot, pass-and-play handoffs, online room links/reconnection, install guidance, offline caching, tested rules engines, and a live Render gateway.
