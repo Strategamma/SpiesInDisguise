@@ -1,14 +1,14 @@
 # Goal
-Replace the linear pursuit track with a playful circular board without changing game rules.
+Add clear, consistent navigation across home, setup, rules, and active game states.
 
 # Scope
-The gameplay board, agent markers, progress legend, and related explanatory copy. Preserve movement math, win conditions, cards, and networking.
+A persistent Home/Play/Rules navigation bar, meaningful active states, jump targets, and confirmation before abandoning an unfinished match.
 
 # Approach
-Place 24 signal nodes around a ring, highlight the 12-space pursuit arc, start agents opposite each other, and calculate their marker coordinates so combined progress converges at an interception point.
+Render one shared bottom navigation from the app shell, route Play to the relevant section for the current screen, and use a native dialog to guard destructive Home navigation during active play.
 
 # Risks
-Marker overlap near interception, cramped labels on narrow phones, and a visual that no longer matches the underlying 12-space calculation.
+Fixed navigation covering mobile actions, duplicate rule controls, and accidentally discarding room or local-game state.
 
 # Verification
-Check coordinate boundaries and convergence math, run rules and syntax tests, serve the UI, and attempt the required Playwright screenshot flow while retaining the known macOS sandbox limitation.
+Check navigation bindings and dialog actions, run rules and syntax tests, serve the UI, and attempt the required Playwright interaction flow while retaining the known macOS sandbox limitation.

@@ -18,8 +18,9 @@ Two players begin 12 spaces apart. Each turn the active player offers two differ
 - Server is the sole authority for hands, offers, turns, movement, and outcomes.
 - Never send an opponent's hand or concealed offer card to a client.
 - Touch targets are at least 44px; primary play flow fits a narrow phone viewport.
+- Persistent Home/Play/Rules navigation is shared across screens; leaving an unfinished match requires confirmation.
 - The 12-space pursuit is visualized as a circular signal ring; this is presentation only and does not alter movement or win calculations.
 - Keep visible copy concise and game-native.
 
 ## Current state
-Playable 1v1 PWA with a mobile-first mode home, circular pursuit board, visible onboarding and rules briefing, redesigned cards, offline Bot, pass-and-play, online rooms/reconnection, install guidance, offline caching, tested rules engines, and a live Render gateway.
+Playable 1v1 PWA with persistent navigation, a mobile-first mode home, circular pursuit board, onboarding and rules, redesigned cards, offline Bot, pass-and-play, online rooms/reconnection, installation, offline caching, tested rules engines, and a live Render gateway.

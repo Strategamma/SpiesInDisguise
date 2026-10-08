@@ -13,3 +13,4 @@
 - Cards prioritize identity, plain-language behavior, and labeled 1st/2nd/3rd recruitment movement. Contact color is supportive rather than the only identifier; selection and revealed states use text labels.
 - Mobile hands use a two-column grid so all four contacts remain scannable without horizontal discovery. The sticky action bar always states the current offer-building step.
 - The pursuit board is a circular signal ring: agents start on opposite sides, advance along the highlighted 12-space arc, and converge on a clearly marked interception point. The center prioritizes remaining distance; a compact legend names both agents and their movement.
+- Primary navigation is a persistent three-item dock: Home, Play, and Rules. Play jumps to mode selection or the current decision, active location is explicit, and leaving an unfinished match always requires confirmation.
