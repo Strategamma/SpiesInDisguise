@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { nextRecruitIndex } from "../public/ui-logic.js";
+import { boardPosition, interceptionGap, nextRecruitIndex } from "../public/ui-logic.js";
 
 test("card preview highlights the next applicable recruitment stage", () => {
   const players = [{ collection: {} }, { collection: { courier: 1, ghost: 2, oracle: 5 } }];
@@ -8,4 +8,15 @@ test("card preview highlights the next applicable recruitment stage", () => {
   assert.equal(nextRecruitIndex(players, 1, "courier"), 1);
   assert.equal(nextRecruitIndex(players, 1, "ghost"), 2);
   assert.equal(nextRecruitIndex(players, 1, "oracle"), 2);
+});
+
+test("board positions share one twelve-space clockwise loop with a six-space gap", () => {
+  assert.equal(boardPosition(0, 0), 0);
+  assert.equal(boardPosition(1, 0), 6);
+  assert.equal(boardPosition(0, 2), 2);
+  assert.equal(boardPosition(1, 2), 8);
+  assert.equal(boardPosition(0, -1), 11);
+  assert.equal(interceptionGap([{ progress: 0 }, { progress: 0 }]), 6);
+  assert.equal(interceptionGap([{ progress: 4 }, { progress: 1 }]), 3);
+  assert.equal(interceptionGap([{ progress: -2 }, { progress: 4 }]), 0);
 });

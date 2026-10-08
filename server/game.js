@@ -5,7 +5,7 @@ export const CONTACTS = {
   handler: [1, 3, 1], oracle: [0, 1, 2], renegade: [3, 4, -3]
 };
 
-const TRACK = 12;
+const START_GAP = 6;
 const COPIES = 6;
 
 export function token() { return crypto.randomBytes(18).toString("base64url"); }
@@ -66,7 +66,7 @@ function recruit(player, card) {
   const count = (player.collection[card.kind] || 0) + 1;
   player.collection[card.kind] = count;
   const movement = CONTACTS[card.kind][Math.min(2, count - 1)];
-  player.progress = Math.max(0, player.progress + movement);
+  player.progress += movement;
 }
 
 export function chooseOffer(room, playerIndex, choice) {
@@ -81,13 +81,13 @@ export function chooseOffer(room, playerIndex, choice) {
 }
 
 export function resolveWinner(room, active) {
-  const wins = room.players.map((p, i) => p.progress + room.players[1 - i].progress >= TRACK || (p.collection.oracle || 0) >= 3);
+  const wins = room.players.map((p, i) => p.progress - room.players[1 - i].progress >= START_GAP || (p.collection.oracle || 0) >= 3);
   const loses = room.players.map(p => (p.collection.renegade || 0) >= 3);
   const candidates = [0, 1].filter(i => wins[i] || loses[1 - i]);
   if (candidates.length) {
     room.winner = candidates.length === 2 ? active : candidates[0];
     const winner = room.players[room.winner];
-    room.resultReason = (winner.collection.oracle || 0) >= 3 ? "Three Oracles exposed the rival network." : loses[1 - room.winner] ? "The rival recruited a third Renegade." : "The pursuit gap was closed.";
+    room.resultReason = (winner.collection.oracle || 0) >= 3 ? "Three Oracles exposed the rival network." : loses[1 - room.winner] ? "The rival recruited a third Renegade." : "The rival was caught on the 12-space loop.";
     room.phase = "finished";
     return;
   }

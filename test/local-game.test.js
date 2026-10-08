@@ -18,3 +18,13 @@ test("bot always offers a legal pair and returns a valid choice", () => {
   localOffer(game, 1, offer.openId, offer.hiddenId);
   assert.ok(["open", "hidden"].includes(chooseBotCard(game)));
 });
+
+test("local chase uses the same six-space relative interception rule", () => {
+  const game = createLocalGame("local", "One", () => .3);
+  game.players[0].progress = 5;
+  game.players[0].hand = [{ id: "a", kind: "oracle" }, { id: "b", kind: "courier" }, { id: "c", kind: "ghost" }, { id: "d", kind: "handler" }];
+  localOffer(game, 0, "a", "b"); localChoose(game, 1, "open");
+  assert.equal(game.players[0].progress, 6);
+  assert.equal(game.winner, 0);
+  assert.match(game.resultReason, /12-space loop/);
+});

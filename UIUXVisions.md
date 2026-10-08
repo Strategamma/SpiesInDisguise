@@ -12,7 +12,7 @@
 - Home onboarding uses a short briefing entry plus a visible three-step How to Play preview; the full briefing explains the offer/choose/recruit loop, all win conditions, and the contact dossier.
 - Cards prioritize identity, plain-language behavior, and labeled 1st/2nd/3rd recruitment movement. Contact color is supportive rather than the only identifier; selection and revealed states use text labels.
 - Mobile hands use a two-column grid so all four contacts remain scannable without horizontal discovery. The sticky action bar always states the current offer-building step.
-- The pursuit board is a circular signal ring: agents start on opposite sides, advance along the highlighted 12-space arc, and converge on a clearly marked interception point. The center prioritizes remaining distance; a compact legend names both agents and their movement.
+- The pursuit board is one numbered 12-space clockwise loop. Agents start opposite each other, six spaces apart, and both move in the same direction. The center shows the remaining relative gap; the legend shows each board space and signed net movement.
 - Primary navigation is a persistent three-item dock: Home, Play, and Rules. Play jumps to mode selection or the current decision, active location is explicit, and leaving an unfinished match always requires confirmation.
 - Launch uses a branded, tap-to-enter signal splash; that gesture safely enables optional synthesized game audio. A persistent header control stores the sound preference. Motion remains restrained and honors reduced-motion settings.
 - Online rooms open into an explicit lobby with two agent slots, room sharing, connected/ready status, individual ready controls, and a host-only launch button. No cards are dealt before launch.
@@ -32,3 +32,4 @@
 - Treat the live match as one game table, not unrelated stacked panels. Desktop uses a compact left rail for status, pursuit board, and networks beside the active decision surface.
 - Below 900px the same semantic regions collapse without duplicated markup. Status and the compact board lead into the current decision; networks follow as secondary information.
 - The action surface owns the turn heading, hand or offer, and confirmation control. Its width and card grid must remain stable from 320px phones through wide desktop windows.
+- Mobile matches prefer landscape. Installed PWAs declare landscape-primary; supported browsers request an orientation lock after the player's start gesture, while unsupported portrait contexts show a focused rotate prompt.

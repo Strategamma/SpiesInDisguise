@@ -1,7 +1,7 @@
 # Project memory
 
 ## Product
-`Spies in Disguise` is a mobile-first, installable two-player bluffing card game for decadenceinc.com. It is an original game inspired by the public “one face-up, one face-down; opponent chooses” mechanism, not an official Agent Avenue adaptation. Do not use Agent Avenue names, copy, artwork, or branding without a license.
+`Spies in Disguise` is an installable two-player bluffing game for decadenceinc.com. It is inspired by the public “one face-up, one face-down; opponent chooses” mechanism, not an official Agent Avenue adaptation. Do not use Agent Avenue names, copy, artwork, or branding without a license.
 
 ## Architecture
 - Static PWA in `public/`: semantic HTML, CSS, and dependency-free browser JavaScript.
@@ -14,7 +14,7 @@
 - Browser room messages use protocol `2`; the server auto-starts protocol-1 rooms to keep cached pre-lobby clients compatible during rollout.
 
 ## Game rules
-Two players begin 12 spaces apart. Each turn the active player offers two different contacts, one openly and one concealed. The opponent takes either card; the active player gets the other. Recruiting the 1st/2nd/3rd copy applies that contact's corresponding movement. The first side whose combined progress closes the 12-space gap wins. Three Oracles wins instantly; three Renegades loses instantly. Active player wins simultaneous outcomes. Hands refill to four.
+Two players begin six spaces apart on one 12-space loop and both move clockwise. Each turn the active player offers two different contacts, one openly and one concealed. The opponent takes either card; the active player gets the other. Recruiting the 1st/2nd/3rd copy applies that contact's corresponding signed movement. An agent intercepts by gaining six cumulative spaces on the rival. Three Oracles wins instantly; three Renegades loses instantly. Active player wins simultaneous special outcomes. Hands refill to four.
 
 ## Conventions
 - Server is the sole authority for hands, offers, turns, movement, and outcomes.
@@ -23,7 +23,8 @@ Two players begin 12 spaces apart. Each turn the active player offers two differ
 - Touch targets are at least 44px; primary play flow fits a narrow phone viewport.
 - Persistent Home/Play/Rules navigation is shared across screens; leaving an unfinished match requires confirmation.
 - Launch audio is synthesized with Web Audio after a user gesture; the mute preference is stored locally and reduced-motion is honored.
-- The 12-space pursuit is visualized as a circular signal ring; this is presentation only and does not alter movement or win calculations.
+- Board position is cumulative movement modulo 12; player two starts at index 6. Relative movement of ±6 triggers interception.
+- Installed mobile PWA orientation is landscape-primary; browsers that cannot lock orientation receive an in-match rotate prompt.
 - Live matches use one semantic status/board/action/network layout: a two-column game table from 900px and an action-led single-column flow below it.
 - Keep visible copy concise and game-native.
 

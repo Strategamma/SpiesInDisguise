@@ -1,14 +1,14 @@
 # Goal
-Restructure the live match screen into a cohesive, responsive game table that feels intentional on phones and desktop browsers.
+Change the pursuit board to a 12-space clockwise chase with a six-space starting gap, and prefer landscape orientation during mobile matches.
 
 # Scope
-Match status, player identities, circular board, decision area, hand/offers, network collections, sticky action controls, waiting/handoff/results, and responsive breakpoints. Preserve game logic, privacy, lobby behavior, and navigation.
+Authoritative and local win math, signed movement, board geometry/copy, rules/onboarding, mobile landscape PWA preference, rotate guidance, responsive landscape styling, tests, and offline cache.
 
 # Approach
-Introduce a semantic match layout with dedicated status, board, action, and network regions. Use a two-column desktop table with a compact overview rail, then collapse to a single action-first mobile flow without duplicating state or markup.
+Track each agent's cumulative signed movement. Place them at indices 0 and 6 on one 12-node clockwise loop; both add movement in the same direction. Intercept when either agent gains six relative spaces. Request landscape after a game-start gesture, declare it in the manifest, and show rotate guidance when a mobile browser cannot lock orientation.
 
 # Risks
-Changing visual order without changing turn behavior, cards becoming too narrow at intermediate widths, sticky controls colliding with navigation, and secondary networks distracting from the current decision.
+Server/local rule drift, negative movement being incorrectly clamped, stale clients visualizing the old board, orientation locking being unsupported outside installed/fullscreen contexts, and short landscape viewports crowding controls.
 
 # Verification
-Run syntax and rules tests, inspect all turn-state markup, check 320px/tablet/desktop CSS grids and overflow, verify local server/assets and cache version, attempt Playwright, and document any sandbox-blocked visual checks.
+Test clockwise positions, initial gap, both interception directions, negative movement, Oracle/Renegade outcomes, server/local parity, manifest validity, syntax/build/server assets, landscape CSS, and attempt Playwright under the known sandbox limitation.

@@ -36,3 +36,9 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 - Wide screens now use a 310–330px overview rail beside a contained action surface; tablets use a balanced overview row; phones collapse to a compact single-column match flow with two-column cards and networks.
 - Kept waiting, handoff, offer, reveal, and result states inside the same responsive structure. Bumped the offline cache to v5.
 - Syntax, eight rules tests, CSS balance, and local server assets pass. The required Playwright retry was again blocked before launch by macOS Mach-port permission denial, so visual screenshot QA remains manual.
+
+## 2026-10-08 — Twelve-space clockwise chase
+- Changed server and local rules from combined movement to signed relative movement: both agents travel clockwise on 12 spaces, start six apart, and intercept after gaining six spaces on the rival.
+- Rebuilt board geometry as 12 numbered nodes with shared clockwise movement, wrapped negative positions, relative-gap feedback, and position-aware legends.
+- Declared landscape-primary for the installed PWA, request landscape after mobile game gestures where supported, added a portrait rotate prompt, and compacted short-landscape gameplay. Bumped the cache to v6.
+- Added a portrait escape action for browsers that cannot rotate, while retaining the responsive portrait layout. Eleven automated tests, syntax, manifest parsing, CSS balance, and the local server pass; Playwright remains blocked by the macOS Mach-port sandbox restriction.

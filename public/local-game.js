@@ -3,7 +3,7 @@ export const LOCAL_CONTACTS = {
   handler: [1, 3, 1], oracle: [0, 1, 2], renegade: [3, 4, -3]
 };
 
-const TRACK = 12;
+const START_GAP = 6;
 
 function makeDeck(random = Math.random) {
   const deck = Object.keys(LOCAL_CONTACTS).flatMap(kind => Array.from({ length: 6 }, (_, i) => ({ id: `${kind}-${i}-${Math.floor(random() * 1e9).toString(36)}`, kind })));
@@ -34,7 +34,7 @@ export function localOffer(game, playerIndex, openId, hiddenId) {
 function recruit(target, card) {
   const count = (target.collection[card.kind] || 0) + 1;
   target.collection[card.kind] = count;
-  target.progress = Math.max(0, target.progress + LOCAL_CONTACTS[card.kind][Math.min(2, count - 1)]);
+  target.progress += LOCAL_CONTACTS[card.kind][Math.min(2, count - 1)];
 }
 
 export function localChoose(game, playerIndex, choice) {
@@ -48,13 +48,13 @@ export function localChoose(game, playerIndex, choice) {
 }
 
 function resolve(game, active) {
-  const wins = game.players.map((p, i) => p.progress + game.players[1 - i].progress >= TRACK || (p.collection.oracle || 0) >= 3);
+  const wins = game.players.map((p, i) => p.progress - game.players[1 - i].progress >= START_GAP || (p.collection.oracle || 0) >= 3);
   const loses = game.players.map(p => (p.collection.renegade || 0) >= 3);
   const candidates = [0, 1].filter(i => wins[i] || loses[1 - i]);
   if (candidates.length) {
     game.winner = candidates.length === 2 ? active : candidates[0]; game.phase = "finished";
     const winner = game.players[game.winner];
-    game.resultReason = (winner.collection.oracle || 0) >= 3 ? "Three Oracles exposed the rival network." : loses[1 - game.winner] ? "The rival recruited a third Renegade." : "The pursuit gap was closed.";
+    game.resultReason = (winner.collection.oracle || 0) >= 3 ? "Three Oracles exposed the rival network." : loses[1 - game.winner] ? "The rival recruited a third Renegade." : "The rival was caught on the 12-space loop.";
   } else if (!game.deck.length && game.players.some(p => p.hand.length < 2)) {
     game.winner = game.players[0].progress === game.players[1].progress ? active : (game.players[0].progress > game.players[1].progress ? 0 : 1);
     game.resultReason = "The network ran dry; the closest pursuer wins."; game.phase = "finished";
