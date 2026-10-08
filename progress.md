@@ -30,3 +30,9 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 - Increased muted-text contrast, strengthened focus/hover/pressed feedback, protected sticky controls from the bottom dock, and bumped the offline cache to v4.
 - Fixed inert waiting-state cards so they no longer send invalid choices, and synchronized the Rules navigation item with the dialog's visual and accessible state.
 - Eight automated tests, syntax, CSS balance, local server, and static asset checks pass. Playwright remains blocked before launch by the macOS Mach-port sandbox restriction, so no automated screenshots were produced.
+
+## 2026-10-08 — Responsive match table
+- Replaced the disconnected board/action/sidebar composition with semantic status, board, play, and network regions.
+- Wide screens now use a 310–330px overview rail beside a contained action surface; tablets use a balanced overview row; phones collapse to a compact single-column match flow with two-column cards and networks.
+- Kept waiting, handoff, offer, reveal, and result states inside the same responsive structure. Bumped the offline cache to v5.
+- Syntax, eight rules tests, CSS balance, and local server assets pass. The required Playwright retry was again blocked before launch by macOS Mach-port permission denial, so visual screenshot QA remains manual.

@@ -27,3 +27,8 @@
 - Mode cards are compact decision rows on every viewport: icon, title/context, then a clearly aligned affordance. Recommendations must never compete with the title.
 - The persistent navigation uses a restrained tinted active state; primary game actions, not navigation chrome, carry the strongest filled treatment.
 - Secondary information uses higher-contrast muted text, while panels rely on spacing and thin borders instead of oversized empty areas.
+
+# Match layout
+- Treat the live match as one game table, not unrelated stacked panels. Desktop uses a compact left rail for status, pursuit board, and networks beside the active decision surface.
+- Below 900px the same semantic regions collapse without duplicated markup. Status and the compact board lead into the current decision; networks follow as secondary information.
+- The action surface owns the turn heading, hand or offer, and confirmation control. Its width and card grid must remain stable from 320px phones through wide desktop windows.

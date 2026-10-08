@@ -394,7 +394,15 @@ function renderGame() {
   }
 
   const modeLabel = playMode === "bot" ? "Solo circuit" : playMode === "local" ? "In-person circuit" : "Private room";
-  app.innerHTML = shell(`<div class="panel room-head"><div><span class="eyebrow">${modeLabel}</span><div class="room-code">${playMode === "wifi" ? state.room : playMode === "bot" ? "VS BOT" : "PASS & PLAY"}</div></div>${playMode === "wifi" ? `<button class="icon-btn" id="copy" aria-label="Copy invitation">⧉</button>` : ""}</div><div class="players">${state.players.map(playerBox).join("")}</div>${state.players.length === 2 && state.phase !== "lobby" ? trackHtml() : ""}<div class="game-layout ${state.phase === "lobby" ? "lobby-layout" : ""}" id="play-area"><section>${playArea}</section>${state.phase === "lobby" ? "" : `<aside class="sidebar"><div class="collections">${state.players.map(collectionHtml).join("")}</div></aside>`}</div>`) + revealOverlayHtml();
+  const roomTitle = playMode === "wifi" ? state.room : playMode === "bot" ? "VS BOT" : "PASS & PLAY";
+  const matchStatus = `<section class="panel match-status"><div class="room-head"><div><span class="eyebrow">${modeLabel}</span><div class="room-code">${roomTitle}</div></div>${playMode === "wifi" ? `<button class="icon-btn" id="copy" aria-label="Copy invitation">⧉</button>` : ""}</div><div class="players">${state.players.map(playerBox).join("")}</div></section>`;
+  if (state.phase === "lobby") {
+    app.innerHTML = shell(`${matchStatus}<div class="game-layout lobby-layout" id="play-area"><section>${playArea}</section></div>`) + revealOverlayHtml();
+  } else {
+    const board = state.players.length === 2 ? trackHtml() : "";
+    const networks = state.players.length === 2 ? `<aside class="network-panel" aria-label="Agent networks"><div class="collections">${state.players.map(collectionHtml).join("")}</div></aside>` : "";
+    app.innerHTML = shell(`<div class="match-layout ${state.winner !== null ? "is-result" : ""}">${matchStatus}<div class="board-panel">${board}</div><section class="play-column" id="play-area"><div class="play-content">${playArea}</div></section>${networks}</div>`) + revealOverlayHtml();
+  }
   bindCommon();
   document.querySelector("#ready-player")?.addEventListener("click", () => { playSound("turn"); localHandoff = false; render(); });
   document.querySelector("#copy")?.addEventListener("click", shareRoom);

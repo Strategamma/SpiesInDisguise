@@ -1,14 +1,14 @@
 # Goal
-Polish every player-facing screen into a clearer, denser, mobile-first interface while preserving the established covert visual identity.
+Restructure the live match screen into a cohesive, responsive game table that feels intentional on phones and desktop browsers.
 
 # Scope
-Home hierarchy, mode selection, navigation, setup forms, lobby, board, cards, turn actions, rules/install/leave dialogs, reveal overlay, and result screens. Preserve game logic, privacy, and deployment behavior.
+Match status, player identities, circular board, decision area, hand/offers, network collections, sticky action controls, waiting/handoff/results, and responsive breakpoints. Preserve game logic, privacy, lobby behavior, and navigation.
 
 # Approach
-Refine shared tokens and interaction states first, compact the home and navigation layout, then normalize all game panels and small-screen breakpoints. Use existing markup and architecture; change copy or structure only where it improves comprehension.
+Introduce a semantic match layout with dedicated status, board, action, and network regions. Use a two-column desktop table with a compact overview rail, then collapse to a single action-first mobile flow without duplicating state or markup.
 
 # Risks
-Crowding 320px screens, sticky controls covering content, desktop rules becoming too sparse, and styling changes obscuring selected/revealed card states.
+Changing visual order without changing turn behavior, cards becoming too narrow at intermediate widths, sticky controls colliding with navigation, and secondary networks distracting from the current decision.
 
 # Verification
-Run syntax and rules tests, inspect layout selectors and focus states, verify cache/versioning, attempt Playwright at mobile and desktop sizes, and document any sandbox-blocked visual checks.
+Run syntax and rules tests, inspect all turn-state markup, check 320px/tablet/desktop CSS grids and overflow, verify local server/assets and cache version, attempt Playwright, and document any sandbox-blocked visual checks.

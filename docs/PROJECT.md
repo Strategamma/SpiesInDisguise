@@ -24,6 +24,7 @@ Two players begin 12 spaces apart. Each turn the active player offers two differ
 - Persistent Home/Play/Rules navigation is shared across screens; leaving an unfinished match requires confirmation.
 - Launch audio is synthesized with Web Audio after a user gesture; the mute preference is stored locally and reduced-motion is honored.
 - The 12-space pursuit is visualized as a circular signal ring; this is presentation only and does not alter movement or win calculations.
+- Live matches use one semantic status/board/action/network layout: a two-column game table from 900px and an action-led single-column flow below it.
 - Keep visible copy concise and game-native.
 
 ## Current state
