@@ -17,3 +17,9 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 - Added a tap-to-enter splash, persisted sound toggle, synthesized cues, board/offer transitions, and distinct animated victory/defeat screens. Bumped the offline shell cache to v2.
 - Added protocol-2 identification and legacy auto-start fallback so separate Pages/Render deployments cannot strand cached pre-lobby clients.
 - Seven automated tests pass, including lobby authorization/readiness and legacy compatibility. Two-socket checks passed for ready/start, hand dealing, guest slot reopening, and host lobby closure. Playwright still cannot launch under the macOS Mach service restriction, so visual/audio browser QA remains pending.
+
+## 2026-10-08 — Recruitment preview and reveal flow
+- Added recipient-specific `Next` highlighting for the applicable 1st/2nd/3rd card effect.
+- Added authoritative post-choice reveal events, concealed-card flip, card transfer animation, and reveal sound for online, bot, and pass-and-play games.
+- Verified online privacy and ordering with two WebSocket clients: hidden identity absent before choice, reveal received before state, identities correct, and recruitment applied.
+- Added a focused stage-calculation test. Playwright visual QA remains blocked by macOS sandbox Mach-port permission denial; manual device preview is still required.

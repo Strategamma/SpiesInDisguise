@@ -19,6 +19,7 @@ Two players begin 12 spaces apart. Each turn the active player offers two differ
 ## Conventions
 - Server is the sole authority for hands, offers, turns, movement, and outcomes.
 - Never send an opponent's hand or concealed offer card to a client.
+- After a valid choice, the server emits a reveal event before the updated state; concealed identities must never appear in pre-choice state.
 - Touch targets are at least 44px; primary play flow fits a narrow phone viewport.
 - Persistent Home/Play/Rules navigation is shared across screens; leaving an unfinished match requires confirmation.
 - Launch audio is synthesized with Web Audio after a user gesture; the mute preference is stored locally and reduced-motion is honored.
@@ -26,4 +27,4 @@ Two players begin 12 spaces apart. Each turn the active player offers two differ
 - Keep visible copy concise and game-native.
 
 ## Current state
-Playable 1v1 PWA with animated splash, optional sound, authoritative online lobbies, polished results, persistent navigation, circular board, onboarding, redesigned cards, offline Bot/pass-and-play, reconnection, installation, offline caching, tested rules, and a live Render gateway.
+Playable 1v1 PWA with animated splash, optional sound, authoritative online lobbies, polished results, persistent navigation, circular board, onboarding, redesigned cards, next-recruit movement previews, post-choice card reveals/transfers, offline Bot/pass-and-play, reconnection, installation, offline caching, tested rules, and a live Render gateway.

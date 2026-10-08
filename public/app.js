@@ -1,4 +1,5 @@
 import { chooseBotCard, chooseBotOffer, createLocalGame, localChoose, localOffer, localView } from "./local-game.js";
+import { nextRecruitIndex } from "./ui-logic.js";
 
 const CONTACTS = {
   courier: { name: "Courier", symbol: "◈", moves: [1, 2, 3], note: "Reliable progress with every recruit." },
@@ -28,12 +29,18 @@ let botTimer = null;
 let splashVisible = true;
 let soundEnabled = localStorage.getItem("spies-sound") !== "off";
 let audioContext = null;
+let revealState = null;
+let pendingRevealState = null;
+let revealTimer = null;
+let revealComplete = null;
+const REVEAL_DURATION = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 350 : 1450;
 
 const SOUND_PATTERNS = {
   start: [[220, .08, 0], [330, .1, .08], [494, .16, .17]],
   tap: [[420, .055, 0]],
   select: [[330, .05, 0], [520, .07, .045]],
   offer: [[620, .07, 0], [440, .09, .07]],
+  reveal: [[260, .06, 0], [520, .12, .08], [780, .11, .2]],
   turn: [[392, .06, 0], [587, .1, .07]],
   move: [[294, .07, 0], [440, .08, .06], [659, .11, .13]],
   win: [[392, .1, 0], [494, .1, .09], [587, .1, .18], [784, .24, .27]],
@@ -81,6 +88,29 @@ function applyState(next) {
   else if (previous.phase !== next.phase && next.phase === "offer") playSound("turn");
 }
 
+function startReveal(payload, onComplete = null) {
+  clearTimeout(revealTimer);
+  revealState = payload;
+  pendingRevealState = null;
+  revealComplete = onComplete;
+  playSound("reveal");
+  renderGame();
+  revealTimer = setTimeout(finishReveal, REVEAL_DURATION);
+}
+
+function queueAfterReveal(next) {
+  pendingRevealState = next;
+}
+
+function finishReveal() {
+  clearTimeout(revealTimer);
+  revealTimer = null;
+  revealState = null;
+  if (pendingRevealState) { const next = pendingRevealState; pendingRevealState = null; applyState(next); }
+  render();
+  const complete = revealComplete; revealComplete = null; complete?.();
+}
+
 function gatewayUrl() {
   if (window.SPIES_IN_DISGUISE_GATEWAY || window.SHADOW_CIRCUIT_GATEWAY) return window.SPIES_IN_DISGUISE_GATEWAY || window.SHADOW_CIRCUIT_GATEWAY;
   return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
@@ -105,16 +135,17 @@ function connect() {
   socket.addEventListener("close", () => { connected = false; render(); setTimeout(connect, 1800); });
   socket.addEventListener("message", event => {
     const message = JSON.parse(event.data);
-    if (message.type === "state") {
+    if (message.type === "reveal") startReveal(message);
+    else if (message.type === "state") {
       playMode = "wifi";
-      applyState(message.state);
+      if (revealState) queueAfterReveal(message.state); else applyState(message.state);
       selected = [];
       faceUpId = null;
       localStorage.setItem(`spies-token-${state.room}`, message.token);
       history.replaceState({}, "", `${location.pathname}?room=${state.room}`);
       render();
     } else if (message.type === "error") showToast(message.message);
-    else if (message.type === "room_closed") { state = null; renderHome("That room expired."); }
+    else if (message.type === "room_closed") { clearTimeout(revealTimer); revealState = null; pendingRevealState = null; revealComplete = null; state = null; renderHome("That room expired."); }
   });
 }
 
@@ -144,7 +175,7 @@ function leaveDialog() {
 }
 
 function rulesDialog() {
-  return `<dialog id="rules" class="rules-dialog"><div class="dialog-head"><div><span class="eyebrow">Field briefing</span><h2>How to play</h2></div><button class="dialog-close" data-close-rules aria-label="Close rules">×</button></div><p class="rules-intro">Bluff with two contacts, read your rival, and close the pursuit gap.</p><div class="rule-steps"><article><span>1</span><div><b>Send two signals</b><p>Choose two different contacts. Show one face-up and keep the other concealed.</p></div></article><article><span>2</span><div><b>Your rival chooses</b><p>They recruit the contact they take. You recruit the one they leave behind.</p></div></article><article><span>3</span><div><b>Move around the ring</b><p>A contact’s 1st, 2nd, and 3rd recruitment moves your agent toward interception.</p></div></article></div><div class="win-conditions"><div><span>◆</span><p><b>Intercept your rival</b>Close the combined 12-space gap on the circular board.</p></div><div><span>◇</span><p><b>Oracle shortcut</b>Recruit three Oracles to win immediately.</p></div><div class="danger"><span>✕</span><p><b>Avoid exposure</b>A third Renegade makes you lose immediately.</p></div></div><h3 class="dossier-title">Contact dossier</h3><div class="legend">${Object.entries(CONTACTS).map(([kind, c]) => `<div class="legend-item contact-${kind}"><div class="legend-symbol">${c.symbol}</div><div><b>${c.name}</b><span>${c.note}</span><div class="mini-moves">${c.moves.map((n, i) => `<span><small>${i + 1}${i === 0 ? "st" : i === 1 ? "nd" : "rd"}</small>${n > 0 ? "+" : ""}${n}</span>`).join("")}</div></div></div>`).join("")}</div><button class="primary rules-done" data-close-rules>Start playing</button></dialog>`;
+  return `<dialog id="rules" class="rules-dialog"><div class="dialog-head"><div><span class="eyebrow">Field briefing</span><h2>How to play</h2></div><button class="dialog-close" data-close-rules aria-label="Close rules">×</button></div><p class="rules-intro">Bluff with two contacts, read your rival, and close the pursuit gap.</p><div class="rule-steps"><article><span>1</span><div><b>Send two signals</b><p>Choose two different contacts. Show one face-up and keep the other concealed.</p></div></article><article><span>2</span><div><b>Your rival chooses</b><p>They recruit the contact they take. You recruit the one they leave behind.</p></div></article><article><span>3</span><div><b>Move around the ring</b><p>Each recruitment moves differently. The gold “Next” step shows exactly which move will apply.</p></div></article></div><div class="win-conditions"><div><span>◆</span><p><b>Intercept your rival</b>Close the combined 12-space gap on the circular board.</p></div><div><span>◇</span><p><b>Oracle shortcut</b>Recruit three Oracles to win immediately.</p></div><div class="danger"><span>✕</span><p><b>Avoid exposure</b>A third Renegade makes you lose immediately.</p></div></div><h3 class="dossier-title">Contact dossier</h3><div class="legend">${Object.entries(CONTACTS).map(([kind, c]) => `<div class="legend-item contact-${kind}"><div class="legend-symbol">${c.symbol}</div><div><b>${c.name}</b><span>${c.note}</span><div class="mini-moves">${c.moves.map((n, i) => `<span><small>${i + 1}${i === 0 ? "st" : i === 1 ? "nd" : "rd"}</small>${n > 0 ? "+" : ""}${n}</span>`).join("")}</div></div></div>`).join("")}</div><button class="primary rules-done" data-close-rules>Start playing</button></dialog>`;
 }
 
 function installDialog() {
@@ -189,6 +220,7 @@ async function installApp() {
 
 function returnHome() {
   clearTimeout(botTimer);
+  clearTimeout(revealTimer); revealTimer = null; revealState = null; pendingRevealState = null; revealComplete = null;
   if (playMode === "wifi" && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "leave" }));
   playMode = null; localGame = null; state = null; localHandoff = false; pendingRoom = ""; homePanel = null;
   selected = []; faceUpId = null;
@@ -233,8 +265,11 @@ function localAction(type, payload = {}) {
       if (playMode === "local") { applyState(localView(localGame, 1 - state.you)); localHandoff = true; render(); }
       else { applyState(localView(localGame, 0)); render(); botTimer = setTimeout(runBotRound, 650); }
     } else if (type === "choose") {
+      const offer = localGame.offer; const chooser = state.you;
       localChoose(localGame, state.you, payload.choice);
-      applyState(localView(localGame, state.you)); render();
+      const next = localView(localGame, state.you);
+      startReveal({ type: "reveal", choice: payload.choice, chosen: offer[payload.choice], other: offer[payload.choice === "open" ? "hidden" : "open"], chooser });
+      queueAfterReveal(next);
     } else if (type === "rematch") startLocal(playMode);
   } catch (error) { showToast(error.message); }
 }
@@ -242,10 +277,18 @@ function localAction(type, payload = {}) {
 function runBotRound() {
   if (playMode !== "bot" || !localGame || localGame.winner !== null) return;
   if (localGame.phase === "choose" && localGame.offer.by === 0) {
-    localChoose(localGame, 1, chooseBotCard(localGame));
-    applyState(localView(localGame, 0)); render();
+    const offer = localGame.offer; const choice = chooseBotCard(localGame);
+    localChoose(localGame, 1, choice);
+    const next = localView(localGame, 0);
+    startReveal({ type: "reveal", choice, chosen: offer[choice], other: offer[choice === "open" ? "hidden" : "open"], chooser: 1 }, scheduleBotOffer);
+    queueAfterReveal(next);
+    return;
   }
-  if (localGame.winner === null && localGame.phase === "offer" && localGame.turn === 1) {
+  scheduleBotOffer();
+}
+
+function scheduleBotOffer() {
+  if (playMode === "bot" && localGame?.winner === null && localGame.phase === "offer" && localGame.turn === 1) {
     botTimer = setTimeout(() => {
       const offer = chooseBotOffer(localGame);
       localOffer(localGame, 1, offer.openId, offer.hiddenId);
@@ -259,7 +302,26 @@ function cardHtml(card, options = {}) {
   const c = CONTACTS[card.kind];
   const selectedClass = selected.includes(card.id) ? " selected" : "";
   const isOpen = faceUpId === card.id;
-  return `<button class="card contact-${card.kind}${selectedClass}${isOpen ? " face-up" : ""}" ${options.attr || ""} data-card="${card.id}" aria-pressed="${selected.includes(card.id)}"><div class="card-top"><span class="card-symbol">${c.symbol}</span>${isOpen ? `<span class="open-badge">Revealed</span>` : `<span class="contact-type">Contact</span>`}</div><div class="card-name">${c.name}</div><div class="card-effect">${c.note}</div><div class="card-moves" aria-label="Movement on first, second, and third recruit">${c.moves.map((n, i) => `<span class="move"><small>${i + 1}${i === 0 ? "st" : i === 1 ? "nd" : "rd"}</small><b>${n > 0 ? "+" : ""}${n}</b></span>`).join("")}</div>${selected.includes(card.id) ? `<span class="selected-mark">${isOpen ? "Shown" : "Selected"}</span>` : ""}</button>`;
+  const playerIndex = options.playerIndex ?? state.you;
+  const recruitIndex = nextRecruitIndex(state.players, playerIndex, card.kind);
+  const tag = options.static ? "div" : "button";
+  const interaction = options.static ? "" : `${options.attr || ""} data-card="${card.id}" aria-pressed="${selected.includes(card.id)}"`;
+  return `<${tag} class="card contact-${card.kind}${selectedClass}${isOpen ? " face-up" : ""}${options.static ? " static-card" : ""}" ${interaction}><div class="card-top"><span class="card-symbol">${c.symbol}</span>${isOpen ? `<span class="open-badge">Revealed</span>` : `<span class="contact-type">Contact</span>`}</div><div class="card-name">${c.name}</div><div class="card-effect">${c.note}</div><div class="card-moves" aria-label="Movement on first, second, and third recruit">${c.moves.map((n, i) => `<span class="move ${i === recruitIndex ? "next-move" : ""}" ${i === recruitIndex ? 'aria-current="step"' : ""}><small>${i + 1}${i === 0 ? "st" : i === 1 ? "nd" : "rd"}</small><b>${n > 0 ? "+" : ""}${n}</b>${i === recruitIndex ? "<em>Next</em>" : ""}</span>`).join("")}</div>${selected.includes(card.id) ? `<span class="selected-mark">${isOpen ? "Shown" : "Selected"}</span>` : ""}</${tag}>`;
+}
+
+function revealCardHtml(card, wasHidden, recipient) {
+  const front = cardHtml(card, { static: true, playerIndex: recipient });
+  if (!wasHidden) return `<div class="transfer-card face-known">${front}</div>`;
+  return `<div class="flip-card"><div class="flip-card-inner"><div class="flip-card-face flip-card-back"><span>?</span><small>Concealed signal</small></div><div class="flip-card-face flip-card-front">${front}</div></div></div>`;
+}
+
+function revealOverlayHtml() {
+  if (!revealState) return "";
+  const chooser = revealState.chooser;
+  const otherRecipient = 1 - chooser;
+  const chooserLabel = chooser === state.you ? "You recruited" : `${escapeHtml(state.players[chooser]?.name || "Rival")} recruited`;
+  const otherLabel = otherRecipient === state.you ? "You recruited" : `${escapeHtml(state.players[otherRecipient]?.name || "Rival")} recruited`;
+  return `<div class="reveal-overlay" role="status" aria-live="assertive"><div class="reveal-heading"><span class="eyebrow">Signals resolved</span><h2>${revealState.choice === "hidden" ? "Identity revealed" : "Choice confirmed"}</h2></div><div class="reveal-stage"><div class="reveal-lane chosen"><span>${chooserLabel}</span>${revealCardHtml(revealState.chosen, revealState.choice === "hidden", chooser)}</div><div class="reveal-divider"><i></i><b>Recruit</b><i></i></div><div class="reveal-lane other"><span>${otherLabel}</span>${revealCardHtml(revealState.other, revealState.choice === "open", otherRecipient)}</div></div></div>`;
 }
 
 function playerBox(player, index) {
@@ -322,7 +384,7 @@ function renderGame() {
   }
 
   const modeLabel = playMode === "bot" ? "Solo circuit" : playMode === "local" ? "In-person circuit" : "Private room";
-  app.innerHTML = shell(`<div class="panel room-head"><div><span class="eyebrow">${modeLabel}</span><div class="room-code">${playMode === "wifi" ? state.room : playMode === "bot" ? "VS BOT" : "PASS & PLAY"}</div></div>${playMode === "wifi" ? `<button class="icon-btn" id="copy" aria-label="Copy invitation">⧉</button>` : ""}</div><div class="players">${state.players.map(playerBox).join("")}</div>${state.players.length === 2 && state.phase !== "lobby" ? trackHtml() : ""}<div class="game-layout ${state.phase === "lobby" ? "lobby-layout" : ""}" id="play-area"><section>${playArea}</section>${state.phase === "lobby" ? "" : `<aside class="sidebar"><div class="collections">${state.players.map(collectionHtml).join("")}</div></aside>`}</div>`);
+  app.innerHTML = shell(`<div class="panel room-head"><div><span class="eyebrow">${modeLabel}</span><div class="room-code">${playMode === "wifi" ? state.room : playMode === "bot" ? "VS BOT" : "PASS & PLAY"}</div></div>${playMode === "wifi" ? `<button class="icon-btn" id="copy" aria-label="Copy invitation">⧉</button>` : ""}</div><div class="players">${state.players.map(playerBox).join("")}</div>${state.players.length === 2 && state.phase !== "lobby" ? trackHtml() : ""}<div class="game-layout ${state.phase === "lobby" ? "lobby-layout" : ""}" id="play-area"><section>${playArea}</section>${state.phase === "lobby" ? "" : `<aside class="sidebar"><div class="collections">${state.players.map(collectionHtml).join("")}</div></aside>`}</div>`) + revealOverlayHtml();
   bindCommon();
   document.querySelector("#ready-player")?.addEventListener("click", () => { playSound("turn"); localHandoff = false; render(); });
   document.querySelector("#copy")?.addEventListener("click", shareRoom);
@@ -360,7 +422,7 @@ async function shareRoom() {
 }
 
 function render() { splashVisible ? renderSplash() : state ? renderGame() : renderHome(); }
-window.render_game_to_text = () => JSON.stringify(splashVisible ? { screen: "splash", soundEnabled, connected } : state ? { screen: state.phase === "lobby" ? "lobby" : state.winner !== null ? "result" : "game", mode: playMode, you: state.you, turn: state.turn, phase: state.phase, winner: state.winner, selected, revealed: faceUpId, hand: state.hand?.map(card => ({ id: card.id, kind: card.kind })), offer: state.offer ? { open: state.offer.open?.kind, concealed: true } : null, players: state.players.map(player => ({ name: player.name, progress: player.progress, collection: player.collection, connected: player.connected, ready: player.ready })) } : { screen: "home", panel: homePanel, connected, soundEnabled });
+window.render_game_to_text = () => JSON.stringify(splashVisible ? { screen: "splash", soundEnabled, connected } : state ? { screen: revealState ? "reveal" : state.phase === "lobby" ? "lobby" : state.winner !== null ? "result" : "game", mode: playMode, you: state.you, turn: state.turn, phase: state.phase, winner: state.winner, selected, revealed: faceUpId, resolving: revealState ? { choice: revealState.choice, chosen: revealState.chosen.kind, other: revealState.other.kind, chooser: revealState.chooser } : null, hand: state.hand?.map(card => ({ id: card.id, kind: card.kind })), offer: state.offer ? { open: state.offer.open?.kind, concealed: true } : null, players: state.players.map(player => ({ name: player.name, progress: player.progress, collection: player.collection, connected: player.connected, ready: player.ready })) } : { screen: "home", panel: homePanel, connected, soundEnabled });
 window.advanceTime = () => {};
 addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; render(); });
 addEventListener("appinstalled", () => { installPrompt = null; render(); showToast("Spies in Disguise installed"); });

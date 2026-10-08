@@ -54,7 +54,12 @@ wss.on("connection", ws => {
         if (message.type === "ready") setReady(room, i, message.ready);
         else if (message.type === "start") startGame(room, i);
         else if (message.type === "offer") submitOffer(room, i, message.openId, message.hiddenId);
-        else if (message.type === "choose") chooseOffer(room, i, message.choice);
+        else if (message.type === "choose") {
+          const offer = room.offer;
+          chooseOffer(room, i, message.choice);
+          const chosen = offer[message.choice]; const other = offer[message.choice === "open" ? "hidden" : "open"];
+          room.players.forEach(player => emit(player.socket, { type: "reveal", choice: message.choice, chosen, other, chooser: i }));
+        }
         else if (message.type === "rematch") { room.rematchVotes.add(i); if (room.rematchVotes.size === 2) restart(room); }
         else throw new Error("Unknown action.");
         update(room);

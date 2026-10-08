@@ -17,3 +17,8 @@
 - Launch uses a branded, tap-to-enter signal splash; that gesture safely enables optional synthesized game audio. A persistent header control stores the sound preference. Motion remains restrained and honors reduced-motion settings.
 - Online rooms open into an explicit lobby with two agent slots, room sharing, connected/ready status, individual ready controls, and a host-only launch button. No cards are dealt before launch.
 - Results use distinct mission-complete and mission-compromised treatments. Celebration effects never cover rematch or Home actions, and online rematch voting reports its waiting state.
+
+# Card decision feedback
+- Each visible contact card highlights the exact 1st, 2nd, or 3rd recruitment effect that its recipient would trigger next. Use the gold movement cell and mint `Next` label consistently.
+- A concealed identity remains visually and structurally hidden until a choice is accepted. Then flip the concealed card and animate both cards toward their recipients before applying the new board state.
+- Reveal timing should feel deliberate without delaying play; reduced-motion users receive an abbreviated, non-spatial transition.

@@ -1,14 +1,14 @@
 # Goal
-Ship a production-ready launch-to-lobby-to-game flow with polished feedback and finales.
+Make card decisions self-explanatory and animate the authoritative reveal/recruit outcome in real time.
 
 # Scope
-Launch experience, authoritative online lobby/readiness/start flow, synthesized audio, persistent mute control, gameplay transitions, and final result presentation. Preserve game rules.
+Next-recruit movement highlighting, concealed-card flip, two-card transfer animation, online/local/bot outcome timing, and supporting sound. Preserve rules, lobby, privacy, and reconnection.
 
 # Approach
-Gate launch behind one user gesture; add server-owned lobby state with ready flags and host start validation; synthesize short Web Audio cues; detect state transitions; add restrained CSS motion; render distinct finales.
+Derive the relevant 1st/2nd/3rd movement from each recipient’s collection, emit a reveal event only after a valid choice resolves, hold the next state briefly while cards flip and travel, then apply the authoritative result.
 
 # Risks
-Lobby reconnect/leave edge cases, unauthorized start attempts, browser audio restrictions, duplicate sounds during rerenders, excessive motion, and result effects obscuring mobile actions.
+Leaking concealed identity before choice, applying queued state twice, timer races during reconnect/leave, and displaying the movement stage for the wrong recipient.
 
 # Verification
-Test lobby join/ready/start authorization and privacy, existing rules, sound gating, syntax/server health, result branches, and attempt Playwright while retaining the known macOS sandbox limitation.
+Test hidden-card privacy before choice, reveal payload correctness after choice, recipient-specific stage calculation, queued transition timing, existing rules/lobby flows, syntax/server health, and attempt Playwright under the known sandbox limitation.
