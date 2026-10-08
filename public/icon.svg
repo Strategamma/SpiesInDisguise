@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Spies in Disguise</title>
+  <desc id="desc">A question mark on a clean mystery card.</desc>
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="170%" height="180%"><feDropShadow dx="0" dy="18" stdDeviation="15" flood-color="#000" flood-opacity=".32"/></filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#0d1426"/>
+  <g filter="url(#shadow)">
+    <rect x="171" y="104" width="224" height="320" rx="28" fill="#6f63d9" transform="rotate(8 283 264)"/>
+    <g transform="rotate(-4 250 254)">
+      <rect x="126" y="88" width="248" height="332" rx="28" fill="#f3f7f4" stroke="#75f0c2" stroke-width="9"/>
+      <path d="M194 200c0-43 32-70 78-70 45 0 77 27 77 66 0 31-17 48-45 66-24 15-32 27-32 50" fill="none" stroke="#10182c" stroke-width="34" stroke-linecap="round"/>
+      <circle cx="272" cy="360" r="18" fill="#10182c"/>
+    </g>
+  </g>
+</svg>
