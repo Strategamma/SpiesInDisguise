@@ -7,7 +7,7 @@
 - Static PWA in `public/`: semantic HTML, CSS, and dependency-free browser JavaScript.
 - `public/local-game.js` powers offline Bot and privacy-gated pass-and-play modes; Wi-Fi mode continues to use the authoritative server.
 - Authoritative multiplayer gateway in `server/`: Node.js + `ws`, also serves `public/` for local testing or a single-service deployment.
-- The browser connects through `window.SPIES_IN_DISGUISE_GATEWAY` in `public/config.js`; otherwise it derives `ws://`/`wss://` from the current host. The legacy `SHADOW_CIRCUIT_GATEWAY` override remains accepted.
+- The browser connects to the deployed gateway at `wss://spiesindisguise.onrender.com` through `window.SPIES_IN_DISGUISE_GATEWAY` in `public/config.js`. The legacy `SHADOW_CIRCUIT_GATEWAY` override remains accepted.
 - Rooms are ephemeral/in-memory, addressed by a six-character code. A private reconnect token is stored in local storage. No accounts or persistent personal data.
 
 ## Game rules
@@ -20,4 +20,4 @@ Two players begin 12 spaces apart. Each turn the active player offers two differ
 - Keep visible copy concise and game-native.
 
 ## Current state
-Playable 1v1 PWA with a Decadence-style mode home, offline Bot, pass-and-play handoffs, online room links/reconnection, install guidance, offline shell caching, tested rules engines, and Render configuration.
+Playable 1v1 PWA with a Decadence-style mode home, offline Bot, pass-and-play handoffs, online room links/reconnection, install guidance, offline shell caching, tested rules engines, and a live Render gateway.
