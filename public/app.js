@@ -1,5 +1,5 @@
 import { chooseBotCard, chooseBotOffer, createLocalGame, localChoose, localOffer, localSwap, localView } from "./local-game.js";
-import { BOARD_SPACES, boardPosition, interceptionGap, nextRecruitIndex } from "./ui-logic.js";
+import { BOARD_SPACES, boardPosition, interceptionGap, nextRecruitIndex, recruitMovementNotice } from "./ui-logic.js";
 
 const CONTACTS = {
   courier: { name: "Courier", symbol: "◈", moves: [1, 2, 3], note: "Reliable progress with every recruit." },
@@ -36,6 +36,8 @@ let revealState = null;
 let pendingRevealState = null;
 let revealTimer = null;
 let revealComplete = null;
+let movementNotice = null;
+let movementTimer = null;
 let landscapePromptDismissed = false;
 const REVEAL_DURATION = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 350 : 1450;
 
@@ -108,8 +110,19 @@ function queueAfterReveal(next) {
 function finishReveal() {
   clearTimeout(revealTimer);
   revealTimer = null;
+  const resolvedReveal = revealState;
   revealState = null;
-  if (pendingRevealState) { const next = pendingRevealState; pendingRevealState = null; applyState(next); }
+  if (pendingRevealState) {
+    const previous = state;
+    const next = pendingRevealState;
+    pendingRevealState = null;
+    if (resolvedReveal && previous?.players && next.players) {
+      movementNotice = recruitMovementNotice(previous, next, resolvedReveal);
+      clearTimeout(movementTimer);
+      movementTimer = setTimeout(() => { movementNotice = null; render(); }, 2600);
+    }
+    applyState(next);
+  }
   render();
   const complete = revealComplete; revealComplete = null; complete?.();
 }
@@ -149,7 +162,7 @@ function connect() {
       history.replaceState({}, "", `${location.pathname}?room=${state.room}`);
       render();
     } else if (message.type === "error") showToast(message.message);
-    else if (message.type === "room_closed") { clearTimeout(revealTimer); revealState = null; pendingRevealState = null; revealComplete = null; state = null; renderHome("That room expired."); }
+    else if (message.type === "room_closed") { clearTimeout(revealTimer); clearTimeout(movementTimer); revealState = null; pendingRevealState = null; revealComplete = null; movementNotice = null; state = null; renderHome("That room expired."); }
   });
 }
 
@@ -161,7 +174,7 @@ function resume() {
 
 function shell(content) {
   const inGame = Boolean(state);
-  return `<div class="app-shell"><header class="topbar"><button class="brand brand-button" data-home aria-label="Return to home"><img class="brand-logo" src="./logo.svg" alt="Spies in Disguise"></button><div class="header-actions">${!state && !isInstalled() ? `<button class="install-button" data-install aria-label="Install Spies in Disguise"><span aria-hidden="true">⇩</span><b>Install</b></button>` : ""}<button class="sound-button" data-sound aria-label="${soundEnabled ? "Mute sounds" : "Turn sounds on"}" aria-pressed="${soundEnabled}"><span aria-hidden="true">${soundEnabled ? "♪" : "×"}</span></button></div></header><div class="app-content">${content}</div><nav class="app-nav" aria-label="Primary navigation"><button class="nav-button ${inGame ? "" : "active"}" data-home ${inGame ? "" : 'aria-current="page"'}><span aria-hidden="true">⌂</span><b>Home</b></button><button class="nav-button ${inGame ? "active" : ""}" data-play ${inGame ? 'aria-current="page"' : ""}><span aria-hidden="true">◉</span><b>Play</b></button><button class="nav-button" data-rules><span aria-hidden="true">?</span><b>Rules</b></button></nav></div>${inGame && !landscapePromptDismissed ? `<div class="rotate-device" role="status"><span aria-hidden="true">↻</span><b>Rotate to landscape</b><small>The board is designed for a wider view.</small><button class="text-btn" data-dismiss-rotate>Continue in portrait</button></div>` : ""}${rulesDialog()}${installDialog()}${leaveDialog()}`;
+  return `<div class="app-shell"><header class="topbar"><button class="brand brand-button" data-home aria-label="Return to home"><img class="brand-logo" src="./logo.svg" alt="Spies in Disguise"></button><div class="header-actions">${!state && !isInstalled() ? `<button class="install-button" data-install aria-label="Install Spies in Disguise"><span aria-hidden="true">⇩</span><b>Install</b></button>` : ""}<button class="sound-button" data-sound aria-label="${soundEnabled ? "Mute sounds" : "Turn sounds on"}" aria-pressed="${soundEnabled}"><span aria-hidden="true">${soundEnabled ? "♪" : "×"}</span></button></div></header><div class="app-content">${content}</div><nav class="app-nav" aria-label="Primary navigation"><button class="nav-button ${inGame ? "" : "active"}" data-home ${inGame ? "" : 'aria-current="page"'}><span aria-hidden="true">⌂</span><b>Home</b></button><button class="nav-button ${inGame ? "active" : ""}" data-play ${inGame ? 'aria-current="page"' : ""}><span aria-hidden="true">◉</span><b>Play</b></button><button class="nav-button" data-rules><span aria-hidden="true">?</span><b>Rules</b></button></nav></div>${inGame && !landscapePromptDismissed ? `<div class="rotate-device" role="status"><span aria-hidden="true">↻</span><b>Rotate to landscape</b><small>The board is designed for a wider view.</small><button class="text-btn" data-dismiss-rotate>Continue in portrait</button></div>` : ""}${rulesDialog()}${contactDetailDialog()}${installDialog()}${leaveDialog()}`;
 }
 
 function renderSplash() {
@@ -199,6 +212,25 @@ function installDialog() {
   return `<dialog id="install-dialog"><span class="eyebrow">Take it with you</span><h2>Install Spies in Disguise</h2><p class="lede">Add the game to your home screen for a full-screen app experience and offline Bot or In Person play.</p><div class="install-steps"><b>iPhone or iPad</b><span>Open the Share menu in Safari, then choose “Add to Home Screen.”</span><b>Other browsers</b><span>Open the browser menu and choose “Install app” or “Add to Home screen.”</span></div><button class="secondary" data-close-install>Close</button></dialog>`;
 }
 
+function contactDetailDialog() {
+  return `<dialog id="contact-detail" class="contact-detail"><div class="dialog-head"><div><span class="eyebrow">Public network</span><h2>Contact details</h2></div><button class="dialog-close" data-close-contact aria-label="Close contact details">×</button></div><div data-contact-content></div><button class="secondary" data-close-contact>Close</button></dialog>`;
+}
+
+function openContactDetail(button) {
+  const ownerIndex = Number(button.dataset.ownerIndex);
+  const kind = button.dataset.contactKind;
+  const player = state?.players?.[ownerIndex];
+  const contact = CONTACTS[kind];
+  if (!player || !contact) return;
+  const count = player.collection[kind] || 0;
+  const nextIndex = contact.single ? 0 : Math.min(count, contact.moves.length - 1);
+  const movement = value => `${value > 0 ? "+" : ""}${value}`;
+  const stages = contact.moves.map((value, index) => `<span class="detail-move ${index === nextIndex ? "next" : ""}"><small>${contact.single ? "Always" : `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`}</small><b>${movement(value)}</b>${index === nextIndex ? "<em>Next recruit</em>" : ""}</span>`).join("");
+  const dialog = document.querySelector("#contact-detail");
+  dialog.querySelector("[data-contact-content]").innerHTML = `<div class="contact-detail-title contact-${kind}"><span>${contact.symbol}</span><div><small>${escapeHtml(player.name)} owns ${count}</small><h3>${contact.name}</h3></div></div><p>${contact.note}</p><div class="detail-moves">${stages}</div><p class="detail-foot">${contact.single ? "This unique contact always uses the same effect." : count >= 3 ? "Further copies keep using the 3rd effect." : `The next copy uses the ${nextIndex + 1}${nextIndex === 0 ? "st" : nextIndex === 1 ? "nd" : "rd"} effect.`}</p>`;
+  dialog.showModal();
+}
+
 function isInstalled() { return matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; }
 
 function preferLandscape() {
@@ -223,6 +255,8 @@ function bindCommon() {
   document.querySelector("[data-stay]")?.addEventListener("click", () => document.querySelector("#leave-dialog").close());
   document.querySelector("[data-confirm-home]")?.addEventListener("click", returnHome);
   document.querySelector("[data-dismiss-rotate]")?.addEventListener("click", () => { landscapePromptDismissed = true; document.querySelector(".rotate-device")?.remove(); });
+  document.querySelectorAll("[data-contact-kind]").forEach(button => button.addEventListener("click", () => openContactDetail(button)));
+  document.querySelectorAll("[data-close-contact]").forEach(button => button.addEventListener("click", () => document.querySelector("#contact-detail")?.close()));
 }
 
 function toggleSound() {
@@ -249,7 +283,7 @@ async function installApp() {
 
 function returnHome() {
   clearTimeout(botTimer);
-  clearTimeout(revealTimer); revealTimer = null; revealState = null; pendingRevealState = null; revealComplete = null;
+  clearTimeout(revealTimer); clearTimeout(movementTimer); revealTimer = null; movementTimer = null; revealState = null; pendingRevealState = null; revealComplete = null; movementNotice = null;
   if (playMode === "wifi" && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "leave" }));
   playMode = null; localGame = null; state = null; localHandoff = false; pendingRoom = ""; homePanel = null;
   selected = []; faceUpId = null; swapMode = false;
@@ -384,14 +418,16 @@ function trackHtml() {
   const positions = state.players.map((player, index) => boardPosition(index, player.progress));
   const [a, b] = positions.map(index => position(-90 + index * (360 / BOARD_SPACES)));
   const gap = interceptionGap(state.players);
-  const nodes = Array.from({ length: BOARD_SPACES }, (_, i) => { const point = position(-90 + i * (360 / BOARD_SPACES)); return `<i class="orbit-node route" style="--x:${point.x}%;--y:${point.y}%"><small>${i + 1}</small></i>`; }).join("");
+  const nodes = Array.from({ length: BOARD_SPACES }, (_, i) => { const point = position(-90 + i * (360 / BOARD_SPACES)); const home = i === 0 ? " start-a" : i === 6 ? " start-b" : ""; return `<i class="orbit-node route${home}" style="--x:${point.x}%;--y:${point.y}%"><small>${i + 1}</small>${home ? `<em>${i === 0 ? "A" : "B"}</em>` : ""}</i>`; }).join("");
   const moved = player => `${player.progress > 0 ? "+" : ""}${player.progress} moved`;
-  return `<div class="orbit-wrap" role="img" aria-label="Twelve-space clockwise pursuit board. Agents are ${gap} relative spaces from interception."><div class="orbit-board"><div class="orbit-ring"></div>${nodes}<div class="orbit-direction" aria-hidden="true">↻</div><div class="orbit-agent agent-a" style="--x:${a.x}%;--y:${a.y}%"><span>A</span></div><div class="orbit-agent agent-b" style="--x:${b.x}%;--y:${b.y}%"><span>B</span></div><div class="orbit-center"><strong>${gap}</strong><span>relative spaces<br>to intercept</span></div></div><div class="orbit-legend"><span><i class="agent-dot a"></i><b>${escapeHtml(state.players[0].name)}</b><small>Space ${positions[0] + 1} · ${moved(state.players[0])}</small></span><span><i class="agent-dot b"></i><b>${escapeHtml(state.players[1].name)}</b><small>Space ${positions[1] + 1} · ${moved(state.players[1])}</small></span></div></div>`;
+  const movement = movementNotice ? `<div class="movement-notice" role="status" aria-live="polite">${movementNotice.map(({ playerIndex, kind, delta }) => `<span class="movement-chip contact-${kind}"><i>${CONTACTS[kind].symbol}</i><b>${escapeHtml(state.players[playerIndex].name)}</b><small>${CONTACTS[kind].name} · ${delta > 0 ? "+" : ""}${delta} ${delta === 1 || delta === -1 ? "space" : "spaces"}</small></span>`).join("")}</div>` : "";
+  const movedPlayers = new Set(movementNotice?.map(item => item.playerIndex) || []);
+  return `<div class="orbit-wrap" role="img" aria-label="Twelve-space clockwise pursuit board. Agents are ${gap} relative spaces from interception."><div class="orbit-caption"><b>Clockwise chase</b><span>Gain 6 spaces on your rival</span></div><div class="orbit-board"><div class="orbit-ring"></div>${nodes}<div class="orbit-direction" aria-hidden="true">↻</div><div class="orbit-agent agent-a ${movedPlayers.has(0) ? "just-moved" : ""}" style="--x:${a.x}%;--y:${a.y}%"><span>A</span></div><div class="orbit-agent agent-b ${movedPlayers.has(1) ? "just-moved" : ""}" style="--x:${b.x}%;--y:${b.y}%"><span>B</span></div><div class="orbit-center"><strong>${gap}</strong><span>spaces gained<br>to intercept</span></div></div>${movement}<div class="orbit-legend"><span><i class="agent-dot a"></i><b>${escapeHtml(state.players[0].name)}</b><small>Space ${positions[0] + 1} · ${moved(state.players[0])}</small></span><span><i class="agent-dot b"></i><b>${escapeHtml(state.players[1].name)}</b><small>Space ${positions[1] + 1} · ${moved(state.players[1])}</small></span></div></div>`;
 }
 
-function collectionHtml(player) {
+function collectionHtml(player, playerIndex) {
   const entries = Object.entries(player.collection).filter(([, count]) => count);
-  return `<div class="collection"><h3>${escapeHtml(player.name)}'s network</h3><div class="chips">${entries.length ? entries.map(([kind, count]) => `<span class="chip">${CONTACTS[kind].symbol} ${CONTACTS[kind].name} ×${count}</span>`).join("") : `<span class="chip">No contacts yet</span>`}</div></div>`;
+  return `<div class="collection"><h3>${escapeHtml(player.name)}'s network <small>Tap to inspect</small></h3><div class="chips">${entries.length ? entries.map(([kind, count]) => { const contact = CONTACTS[kind]; const next = contact.moves[contact.single ? 0 : Math.min(count, contact.moves.length - 1)]; const summary = `${contact.name}: ${count} owned. Next recruit ${next > 0 ? "+" : ""}${next}.`; return `<button class="chip contact-chip contact-${kind}" data-contact-kind="${kind}" data-owner-index="${playerIndex}" data-summary="${summary}" title="${summary}" aria-label="${summary} View details">${contact.symbol} ${contact.name}<b>×${count}</b></button>`; }).join("") : `<span class="chip empty-chip">No contacts yet</span>`}</div></div>`;
 }
 
 function renderGame() {
@@ -476,7 +512,7 @@ async function shareRoom() {
 }
 
 function render() { splashVisible ? renderSplash() : state ? renderGame() : renderHome(); }
-window.render_game_to_text = () => JSON.stringify(splashVisible ? { screen: "splash", soundEnabled, connected } : state ? { screen: revealState ? "reveal" : state.phase === "lobby" ? "lobby" : state.winner !== null ? "result" : "game", mode: playMode, you: state.you, turn: state.turn, phase: state.phase, winner: state.winner, selected, revealed: faceUpId, exchangeMode: swapMode, exchangesRemaining: state.swapsRemaining, deckRemaining: state.deckRemaining, resolving: revealState ? { choice: revealState.choice, chosen: revealState.chosen.kind, other: revealState.other.kind, chooser: revealState.chooser } : null, hand: state.hand?.map(card => ({ id: card.id, kind: card.kind })), offer: state.offer ? { open: state.offer.open?.kind, concealed: true } : null, players: state.players.map(player => ({ name: player.name, progress: player.progress, collection: player.collection, connected: player.connected, ready: player.ready })) } : { screen: "home", panel: homePanel, connected, soundEnabled });
+window.render_game_to_text = () => JSON.stringify(splashVisible ? { screen: "splash", soundEnabled, connected } : state ? { screen: revealState ? "reveal" : state.phase === "lobby" ? "lobby" : state.winner !== null ? "result" : "game", mode: playMode, you: state.you, turn: state.turn, phase: state.phase, winner: state.winner, selected, revealed: faceUpId, exchangeMode: swapMode, exchangesRemaining: state.swapsRemaining, deckRemaining: state.deckRemaining, resolving: revealState ? { choice: revealState.choice, chosen: revealState.chosen.kind, other: revealState.other.kind, chooser: revealState.chooser } : null, movementNotice, hand: state.hand?.map(card => ({ id: card.id, kind: card.kind })), offer: state.offer ? { open: state.offer.open?.kind, concealed: true } : null, players: state.players.map(player => ({ name: player.name, progress: player.progress, collection: player.collection, connected: player.connected, ready: player.ready })) } : { screen: "home", panel: homePanel, connected, soundEnabled });
 window.advanceTime = () => {};
 addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; render(); });
 addEventListener("appinstalled", () => { installPrompt = null; render(); showToast("Spies in Disguise installed"); });

@@ -48,7 +48,7 @@ export function localSwap(game, playerIndex, cardId) {
 function recruit(target, card) {
   const count = (target.collection[card.kind] || 0) + 1;
   target.collection[card.kind] = count;
-  target.progress += LOCAL_CONTACTS[card.kind][Math.min(2, count - 1)];
+  target.progress += LOCAL_CONTACTS[card.kind][Math.min(LOCAL_CONTACTS[card.kind].length - 1, count - 1)];
 }
 
 export function localChoose(game, playerIndex, choice) {

@@ -22,6 +22,8 @@
 - Each visible contact card highlights the exact 1st, 2nd, or 3rd recruitment effect that its recipient would trigger next. Use the gold movement cell and mint `Next` label consistently.
 - A concealed identity remains visually and structurally hidden until a choice is accepted. Then flip the concealed card and animate both cards toward their recipients before applying the new board state.
 - Reveal timing should feel deliberate without delaying play; reduced-motion users receive an abbreviated, non-spatial transition.
+- After the reveal completes, the board briefly pairs each recruited contact with its recipient and signed movement; both moved pieces pulse. This feedback must derive from the authoritative before/after state.
+- Public network chips always show contact and count. Hover gives a concise preview; tap/click opens the full movement curve and highlights the next recruit effect. Never expose hand or concealed-offer data here.
 
 # Interface density
 - Mode cards are compact decision rows on every viewport: icon, title/context, then a clearly aligned affordance. Recommendations must never compete with the title.
@@ -33,3 +35,4 @@
 - Below 900px the same semantic regions collapse without duplicated markup. Status and the compact board lead into the current decision; networks follow as secondary information.
 - The action surface owns the turn heading, hand or offer, and confirmation control. Its width and card grid must remain stable from 320px phones through wide desktop windows.
 - Mobile matches prefer landscape. Installed PWAs declare landscape-primary; supported browsers request an orientation lock after the player's start gesture, while unsupported portrait contexts show a focused rotate prompt.
+- The board labels clockwise direction, the six-space objective, both starting nodes, current positions, and signed net movement without requiring the rules dialog.

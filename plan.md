@@ -1,14 +1,14 @@
 # Goal
-Bring the two-player base game into mechanical parity with the referenced simple-mode rulebook while preserving original Spies in Disguise branding and assets.
+Bring the two-player base game into mechanical parity with the referenced simple mode and make every recruit, collection, and board movement self-explanatory.
 
 # Scope
-Audit setup, hand refill, offer restrictions, optional four-use card exchange, recruit/movement timing, end-step win/loss ties, deck exhaustion, rules UI, bot/local/online parity, tests, and cache. Advanced market cards and 3–4-player teams remain separate modes outside the current two-player scope.
+Audit setup, 38-card balance, hand refill, offer restrictions, four-use exchange, recruit/end timing, ties, deck exhaustion, movement feedback, inspectable collections, board guidance, bot/local/online parity, tests, and cache. Advanced market cards and 3–4-player teams remain separate modes outside the current scope.
 
 # Approach
-Use the publisher rulebook as the behavioral reference, map its generic mechanics onto original contacts, and keep server/local engines identical. Add a server-authoritative exchange action and expose only the counts needed by the UI. Resolve all movement and conditions at the End step.
+Map the published balance onto original contacts and keep server/local engines identical. Add a server-authoritative exchange action. Reuse the post-choice reveal to associate each recruited contact with its movement delta, annotate the board briefly, and expose public collections as inspectable controls.
 
 # Risks
-Exchange exploits outside the Play step, deck-empty off-by-one behavior, information leakage, local/server drift, stale clients sending unsupported actions, and copying protected names/art/copy instead of only interoperable mechanics.
+Exchange exploits, deck-empty off-by-one behavior, movement feedback using the wrong recipient or stale state, collection popovers leaking hand data, timer races, server/local drift, and copying protected expression instead of only mechanics.
 
 # Verification
-Test exchange legality/counts, hand refill, identical-card exception, signed simultaneous movement, all tie combinations, next-player deck exhaustion, server/local parity, syntax/server/cache, and attempt Playwright under the known sandbox limitation.
+Test deck inventory and movement curves, exchanges, refill, identical-card exception, simultaneous movement, ties, exhaustion, feedback recipient/delta mapping, collection counts, server/local parity, syntax/server/cache, and attempt Playwright.

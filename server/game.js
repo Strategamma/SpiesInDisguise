@@ -77,7 +77,7 @@ export function submitOffer(room, playerIndex, openId, hiddenId) {
 function recruit(player, card) {
   const count = (player.collection[card.kind] || 0) + 1;
   player.collection[card.kind] = count;
-  const movement = CONTACTS[card.kind][Math.min(2, count - 1)];
+  const movement = CONTACTS[card.kind][Math.min(CONTACTS[card.kind].length - 1, count - 1)];
   player.progress += movement;
 }
 

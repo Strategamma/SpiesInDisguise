@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { addPlayer, chooseOffer, newPlayer, newRoom, resolveWinner, setReady, startGame, submitOffer, swapCard, viewFor } from "../server/game.js";
+import { CONTACTS, addPlayer, chooseOffer, makeDeck, newPlayer, newRoom, resolveWinner, setReady, startGame, submitOffer, swapCard, viewFor } from "../server/game.js";
 
 function roomReady() { const a = newPlayer("A", 2); const room = newRoom("ABC123", a); addPlayer(room, newPlayer("B", 2)); setReady(room, 0, true); setReady(room, 1, true); startGame(room, 0); return room; }
 
@@ -35,8 +35,16 @@ test("chooser recruits selected card and turn passes", () => {
   const room = roomReady(); room.players[0].hand = [{ id: "a", kind: "courier" }, { id: "b", kind: "ghost" }, { id: "c", kind: "oracle" }, { id: "d", kind: "handler" }];
   submitOffer(room, 0, "a", "b"); chooseOffer(room, 1, "open");
   assert.equal(room.players[1].collection.courier, 1); assert.equal(room.players[1].progress, 1);
-  assert.equal(room.players[0].collection.ghost, 1); assert.equal(room.players[0].progress, 2);
+  assert.equal(room.players[0].collection.ghost, 1); assert.equal(room.players[0].progress, 0);
   assert.equal(room.turn, 1); assert.equal(room.phase, "offer");
+});
+
+test("the deck has the complete 38-card movement balance", () => {
+  const deck = makeDeck(() => .5);
+  const counts = Object.fromEntries(Object.keys(CONTACTS).map(kind => [kind, deck.filter(card => card.kind === kind).length]));
+  assert.equal(deck.length, 38);
+  assert.deepEqual(counts, { courier: 6, analyst: 6, ghost: 6, handler: 6, oracle: 6, renegade: 6, insider: 1, sleeper: 1 });
+  assert.deepEqual(CONTACTS, { courier: [1, 2, 3], analyst: [-1, 6, -1], ghost: [0, 2, 6], handler: [-1, -1, -2], oracle: [0, 0, 0], renegade: [2, 3, 0], insider: [4], sleeper: [-3] });
 });
 
 test("movement is signed and either agent intercepts after gaining six spaces", () => {

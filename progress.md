@@ -42,3 +42,9 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 - Rebuilt board geometry as 12 numbered nodes with shared clockwise movement, wrapped negative positions, relative-gap feedback, and position-aware legends.
 - Declared landscape-primary for the installed PWA, request landscape after mobile game gestures where supported, added a portrait rotate prompt, and compacted short-landscape gameplay. Bumped the cache to v6.
 - Added a portrait escape action for browsers that cannot rotate, while retaining the responsive portrait layout. Eleven automated tests, syntax, manifest parsing, CSS balance, and the local server pass; Playwright remains blocked by the macOS Mach-port sandbox restriction.
+
+## 2026-10-09 — Base rules and board comprehension
+- Audited the published two-player simple rules. Added the 38-card movement balance, two unique contacts, four face-down exchanges per player, correct simultaneous resolution/ties, and next-player deck exhaustion behavior to local and online engines. Advanced-market and 3–4-player team variants remain intentionally outside this two-player build.
+- Added post-reveal board feedback showing each recipient, recruited contact, and signed movement; moved agents pulse on the loop. The board now labels direction, objective, and both start nodes.
+- Public network chips show ownership counts, provide hover summaries, and open a tap/click dossier with the full movement curve and highlighted next effect. No private hand or concealed card data is exposed.
+- Sixteen automated tests, syntax, CSS/manifest structure, diff hygiene, and local health/assets pass. Automated visual QA remains unavailable: Playwright has no browser binary and the browser UI blocks localhost by saved policy, so phone/tablet visual inspection is still manual.

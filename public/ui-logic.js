@@ -15,3 +15,12 @@ export function interceptionGap(players) {
   const difference = Math.abs(Number(players?.[0]?.progress || 0) - Number(players?.[1]?.progress || 0));
   return Math.max(0, START_GAP - difference);
 }
+
+export function recruitMovementNotice(previous, next, reveal) {
+  if (!previous?.players || !next?.players || !reveal || !Number.isInteger(reveal.chooser)) return [];
+  const chooser = reveal.chooser;
+  return [
+    { playerIndex: chooser, kind: reveal.chosen.kind, delta: next.players[chooser].progress - previous.players[chooser].progress },
+    { playerIndex: 1 - chooser, kind: reveal.other.kind, delta: next.players[1 - chooser].progress - previous.players[1 - chooser].progress }
+  ];
+}
