@@ -1,14 +1,14 @@
 # Goal
-Make the existing game folder the GitHub repository root so GitHub Desktop can publish every required file.
+Publish the static PWA from `public/` through GitHub Pages.
 
 # Scope
-Relocate the accidentally nested Git metadata and repository attributes only; preserve all game files and the existing GitHub remote/history.
+Add the minimal GitHub Actions Pages workflow and preserve the existing Render gateway deployment.
 
 # Approach
-Move `.git` and `.gitattributes` from the empty `SpiesInDisguise/` child into the current project root, remove the now-empty child directory, then verify repository root, remote, file status, tests, and required deployment files.
+Upload `public/` as the Pages artifact and deploy it on pushes to `main`; keep relative PWA asset paths compatible with the `/SpiesInDisguise/` subpath.
 
 # Risks
-The GitHub branch may contain a newer web-upload commit, so publishing may require GitHub Desktop to fetch and reconcile it before pushing.
+The repository owner must select GitHub Actions as the Pages source once; publishing can take several minutes.
 
 # Verification
-Confirm the repository root is this folder, required files are tracked as changes, the origin URL is correct, and the test suite passes.
+Validate the workflow, relative asset paths, automated tests, and the live Pages URL after GitHub deploys it.

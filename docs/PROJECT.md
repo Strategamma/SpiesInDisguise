@@ -5,6 +5,7 @@
 
 ## Architecture
 - Static PWA in `public/`: semantic HTML, CSS, and dependency-free browser JavaScript.
+- `.github/workflows/pages.yml` publishes `public/` to GitHub Pages on pushes to `main`; repository Pages source must be GitHub Actions.
 - `public/local-game.js` powers offline Bot and privacy-gated pass-and-play modes; Wi-Fi mode continues to use the authoritative server.
 - Authoritative multiplayer gateway in `server/`: Node.js + `ws`, also serves `public/` for local testing or a single-service deployment.
 - The browser connects to the deployed gateway at `wss://spiesindisguise.onrender.com` through `window.SPIES_IN_DISGUISE_GATEWAY` in `public/config.js`. The legacy `SHADOW_CIRCUIT_GATEWAY` override remains accepted.
