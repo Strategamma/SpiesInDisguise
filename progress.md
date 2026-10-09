@@ -77,3 +77,8 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 ## 2026-10-09 — Waiting-hand visibility
 - Added a compact, non-interactive view of the player's own four cards while the rival prepares an offer, including current movement stage and projected landing space. It is responsive in portrait and short landscape and remains private in online and local state views.
 - Bumped the offline cache to v12. Targeted privacy coverage and the full test suite pass; Playwright visual QA remains blocked by the macOS Chromium permission restriction.
+
+## 2026-10-09 — Volatile contact expansion
+- Confirmed the complete 38-card core is represented by renamed Spies in Disguise contacts. Added four original one-copy contacts: Jammer (+2 and rival −1), Cleaner (+1 and removes one Renegade), Mimic (repeats the user's previous movement), and Slingshot (+5 while behind, −2 while tied/ahead).
+- Implemented simultaneous, pre-move-state resolution in both authoritative Wi‑Fi and offline engines; added live card/dossier previews, public ability labels, bot valuation, protocol-3 room compatibility, and cache v13.
+- Twenty-three automated tests, syntax, and a real protocol-3 local HTTP/WebSocket monitor pass. Chromium was installed to a writable temporary cache, but macOS again denied its Mach rendezvous service, so responsive screenshot inspection remains manual.

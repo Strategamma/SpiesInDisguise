@@ -9,8 +9,20 @@ const CONTACTS = {
   oracle: { name: "Oracle", symbol: "◇", moves: [0, 0, 0], note: "Recruit three to win at the end of the turn." },
   renegade: { name: "Renegade", symbol: "✕", moves: [2, 3, 0], note: "Fast early—recruiting three makes you lose." },
   insider: { name: "Insider", symbol: "↑", moves: [4], note: "A unique contact that moves four spaces forward.", single: true },
-  sleeper: { name: "Sleeper", symbol: "↓", moves: [-3], note: "A unique contact that moves three spaces backward.", single: true }
+  sleeper: { name: "Sleeper", symbol: "↓", moves: [-3], note: "A unique contact that moves three spaces backward.", single: true },
+  jammer: { name: "Jammer", symbol: "ϟ", moves: [2], note: "Move two spaces forward and push your rival one space backward.", ability: "+2 · rival −1", single: true },
+  cleaner: { name: "Cleaner", symbol: "✦", moves: [1], note: "Move one space forward, then remove one Renegade from your network.", ability: "+1 · clear Renegade", single: true },
+  mimic: { name: "Mimic", symbol: "≈", moves: [0], note: "Repeat the movement of the last contact you recruited. Win and loss icons are not copied.", ability: "Repeat last move", dynamic: true, single: true },
+  slingshot: { name: "Slingshot", symbol: "↯", moves: [0], note: "Move five spaces if you are behind; move two spaces backward if you are tied or ahead.", ability: "Behind +5 · ahead −2", dynamic: true, single: true }
 };
+
+function contactMovement(kind, playerIndex, recruitIndex = 0) {
+  const contact = CONTACTS[kind];
+  const player = state?.players?.[playerIndex];
+  if (kind === "mimic") return Number(player?.lastMovement || 0);
+  if (kind === "slingshot") return Number(player?.progress || 0) < Number(state?.players?.[1 - playerIndex]?.progress || 0) ? 5 : -2;
+  return contact.moves[contact.single ? 0 : recruitIndex];
+}
 
 const BOT_PROFILES = {
   rookie: { name: "Rook", label: "Rookie", note: "Learns the cards and plays for its own movement." },
@@ -187,7 +199,7 @@ function connect() {
 function resume() {
   if (!pendingRoom || playMode !== "wifi") return;
   const token = localStorage.getItem(`spies-token-${pendingRoom}`) || localStorage.getItem(`shadow-token-${pendingRoom}`);
-  if (token) send("join", { room: pendingRoom, token, name: savedName || "Agent", protocol: 2 });
+  if (token) send("join", { room: pendingRoom, token, name: savedName || "Agent", protocol: 3 });
 }
 
 function shell(content) {
@@ -210,7 +222,7 @@ function leaveDialog() {
 }
 
 function rulesDialog() {
-  const dossier = Object.entries(CONTACTS).map(([kind, contact]) => `<div class="legend-item contact-${kind}"><div class="legend-symbol">${contact.symbol}</div><div><b>${contact.name}</b><span>${contact.note}</span><div class="mini-moves">${contact.moves.map((movement, index) => `<span class="${contactStageEffect(kind, index, movement).className}"><small>${contact.single ? "Always" : `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`}</small>${stageEffectHtml(kind, index, movement)}</span>`).join("")}</div></div></div>`).join("");
+  const dossier = Object.entries(CONTACTS).map(([kind, contact]) => `<div class="legend-item contact-${kind}"><div class="legend-symbol">${contact.symbol}</div><div><b>${contact.name}</b><span>${contact.note}</span>${contact.ability ? `<div class="mini-ability">${contact.ability}</div>` : `<div class="mini-moves">${contact.moves.map((movement, index) => `<span class="${contactStageEffect(kind, index, movement).className}"><small>${contact.single ? "Always" : `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`}</small>${stageEffectHtml(kind, index, movement)}</span>`).join("")}</div>`}</div></div>`).join("");
   return `<dialog id="rules" class="rules-dialog">
     <div class="dialog-head"><div><span class="eyebrow">Field briefing</span><h2>How to play</h2></div><button class="dialog-close" data-close-rules aria-label="Close rules">×</button></div>
     <p class="rules-intro">Bluff with two contacts, read your rival, and catch them on the loop.</p>
@@ -226,6 +238,7 @@ function rulesDialog() {
       <article><span>4</span><div><b>Resolve the end step</b><p>Only after both agents finish moving, check every win and loss condition. If outcomes tie, the player who made the offer wins.</p></div></article>
     </div>
     <div class="win-conditions"><div><span>◆</span><p><b>Catch your rival</b>Reach or pass them on the 12-space loop.</p></div><div><span>◇</span><p><b>Oracle shortcut</b>Recruit three Oracles to win.</p></div><div class="danger"><span>✕</span><p><b>Avoid exposure</b>A third Renegade makes you lose.</p></div></div>
+    <p class="rules-note"><b>Deck:</b> The complete 38-card core is included under original Spies in Disguise identities, plus four one-copy volatile contacts: Jammer, Cleaner, Mimic, and Slingshot.</p>
     <p class="rules-note"><b>Empty deck:</b> Keep playing without drawing or exchanging. If the next player cannot offer two cards, whoever is closer to catching the rival wins; the offering player wins an exact tie.</p>
     <h3 class="dossier-title">Contact dossier</h3><div class="legend">${dossier}</div><button class="primary rules-done" data-close-rules>Start playing</button>
   </dialog>`;
@@ -247,9 +260,10 @@ function openContactDetail(button) {
   if (!player || !contact) return;
   const count = player.collection[kind] || 0;
   const nextIndex = contact.single ? 0 : Math.min(count, contact.moves.length - 1);
-  const stages = contact.moves.map((value, index) => `<span class="detail-move ${contactStageEffect(kind, index, value).className} ${index === nextIndex ? "next" : ""}"><small>${contact.single ? "Always" : `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`}</small>${stageEffectHtml(kind, index, value)}${index === nextIndex ? "<em>Next recruit</em>" : ""}</span>`).join("");
+  const currentMovement = contactMovement(kind, ownerIndex, nextIndex);
+  const stages = contact.ability ? `<span class="detail-move next"><small>Current effect</small>${stageEffectHtml(kind, 0, currentMovement)}<em>${contact.ability}</em></span>` : contact.moves.map((value, index) => `<span class="detail-move ${contactStageEffect(kind, index, value).className} ${index === nextIndex ? "next" : ""}"><small>${contact.single ? "Always" : `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`}</small>${stageEffectHtml(kind, index, value)}${index === nextIndex ? "<em>Next recruit</em>" : ""}</span>`).join("");
   const dialog = document.querySelector("#contact-detail");
-  dialog.querySelector("[data-contact-content]").innerHTML = `<div class="contact-detail-title contact-${kind}"><span>${contact.symbol}</span><div><small>${escapeHtml(player.name)} owns ${count}</small><h3>${contact.name}</h3></div></div><p>${contact.note}</p><div class="detail-moves">${stages}</div><p class="detail-foot">${contact.single ? "This unique contact always uses the same effect." : count >= 3 ? "Further copies keep using the 3rd effect." : `The next copy uses the ${nextIndex + 1}${nextIndex === 0 ? "st" : nextIndex === 1 ? "nd" : "rd"} effect.`}</p>`;
+  dialog.querySelector("[data-contact-content]").innerHTML = `<div class="contact-detail-title contact-${kind}"><span>${contact.symbol}</span><div><small>${escapeHtml(player.name)} owns ${count}</small><h3>${contact.name}</h3></div></div><p>${contact.note}</p><div class="detail-moves">${stages}</div><p class="detail-foot">${contact.ability ? "This one-copy contact resolves from the public game state shown above." : contact.single ? "This unique contact always uses the same effect." : count >= 3 ? "Further copies keep using the 3rd effect." : `The next copy uses the ${nextIndex + 1}${nextIndex === 0 ? "st" : nextIndex === 1 ? "nd" : "rd"} effect.`}</p>`;
   dialog.showModal();
 }
 
@@ -327,8 +341,8 @@ function renderHome(error = "") {
   document.querySelectorAll("#close-setup,[data-close-setup]").forEach(button => button.addEventListener("click", () => { homePanel = null; renderHome(); }));
   document.querySelectorAll("[data-bot-profile]").forEach(button => button.addEventListener("click", () => { botProfile = button.dataset.botProfile; localStorage.setItem("spies-bot-profile", botProfile); playSound("select"); renderHome(); }));
   document.querySelector("#start-bot")?.addEventListener("click", () => startLocal("bot"));
-  document.querySelector("#create")?.addEventListener("click", () => { const name = remember(); if (!name) return showToast("Choose a codename first"); landscapePromptDismissed = false; preferLandscape(); playMode = "wifi"; send("create", { name, protocol: 2 }); });
-  document.querySelector("#join")?.addEventListener("click", () => { const name = remember(); const room = document.querySelector("#room").value.trim().toUpperCase(); if (!name) return showToast("Choose a codename first"); if (room.length !== 6) return showToast("Enter the six-character code"); landscapePromptDismissed = false; preferLandscape(); pendingRoom = room; playMode = "wifi"; send("join", { room, name, protocol: 2 }); });
+  document.querySelector("#create")?.addEventListener("click", () => { const name = remember(); if (!name) return showToast("Choose a codename first"); landscapePromptDismissed = false; preferLandscape(); playMode = "wifi"; send("create", { name, protocol: 3 }); });
+  document.querySelector("#join")?.addEventListener("click", () => { const name = remember(); const room = document.querySelector("#room").value.trim().toUpperCase(); if (!name) return showToast("Choose a codename first"); if (room.length !== 6) return showToast("Enter the six-character code"); landscapePromptDismissed = false; preferLandscape(); pendingRoom = room; playMode = "wifi"; send("join", { room, name, protocol: 3 }); });
 }
 
 function escapeHtml(value = "") { return String(value).replace(/[&<>'"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c])); }
@@ -402,7 +416,7 @@ function cardHtml(card, options = {}) {
   const isOpen = faceUpId === card.id;
   const playerIndex = options.playerIndex ?? state.you;
   const recruitIndex = nextRecruitIndex(state.players, playerIndex, card.kind);
-  const movement = c.moves[c.single ? 0 : recruitIndex];
+  const movement = contactMovement(card.kind, playerIndex, recruitIndex);
   const stageEffect = contactStageEffect(card.kind, recruitIndex, movement);
   const { current: currentSpace, destination: destinationSpace } = projectedCardPosition(state.players, playerIndex, movement);
   const copyLabel = c.single ? "Unique" : `${recruitIndex + 1}${recruitIndex === 0 ? "st" : recruitIndex === 1 ? "nd" : "rd"}+ copy`;
@@ -411,7 +425,8 @@ function cardHtml(card, options = {}) {
   const tag = options.static ? "div" : "button";
   const label = `${c.name}. ${copyLabel}. ${stageEffect.className === "movement" ? `From space ${currentSpace} to space ${destinationSpace}, ${movementLabel} movement.` : `${stageEffect.label} on recruit.`} ${c.note}`;
   const interaction = options.static ? `aria-label="${label}"` : `${options.attr || ""} data-card="${card.id}" aria-pressed="${selected.includes(card.id)}" aria-label="${label}" title="${c.note}"`;
-  return `<${tag} class="card position-card contact-${card.kind}${selectedClass}${isOpen ? " face-up" : ""}${options.static ? " static-card" : ""}" ${interaction}><div class="card-top"><span class="card-symbol">${c.symbol}</span><span class="contact-type">${isOpen ? "Revealed" : copyLabel}</span></div><div class="card-identity"><div class="card-name">${c.name}</div>${stakes ? `<span class="card-stakes">${stakes}</span>` : ""}</div><div class="card-route ${stageEffect.className !== "movement" ? `terminal-${stageEffect.className}` : ""}" aria-hidden="true"><span class="route-space route-from"><small>Now</small><b>${currentSpace}</b></span><span class="route-move ${stageEffect.className !== "movement" ? stageEffect.className : movement < 0 ? "backward" : movement === 0 ? "still" : "forward"}">${stageEffect.className === "movement" ? `<b>${movementLabel}</b><small>${movement < 0 ? "←" : movement === 0 ? "•" : "→"}</small>` : `<b>${stageEffect.icon}</b><small>${stageEffect.shortLabel}</small>`}</span><span class="route-space route-to"><small>${stageEffect.className !== "movement" ? "Outcome" : movement === 0 ? "Stays" : "Lands"}</small><b>${stageEffect.className !== "movement" ? stageEffect.shortLabel.toUpperCase() : destinationSpace}</b></span></div><div class="card-moves ${c.single ? "single-move" : ""}" aria-label="${c.single ? "Fixed movement" : "Movement on first, second, and third recruit"}">${c.moves.map((n, i) => { const effect = contactStageEffect(card.kind, i, n); return `<span class="move ${effect.className} ${i === recruitIndex ? "next-move" : ""}" ${i === recruitIndex ? 'aria-current="step"' : ""}><small>${c.single ? "Always" : i + 1}</small>${stageEffectHtml(card.kind, i, n)}</span>`; }).join("")}</div>${selected.includes(card.id) ? `<span class="selected-mark">${isOpen ? "Shown" : "Selected"}</span>` : ""}</${tag}>`;
+  const moveCurve = c.ability ? `<div class="card-ability"><span>Ability</span><b>${c.ability}</b></div>` : `<div class="card-moves ${c.single ? "single-move" : ""}" aria-label="${c.single ? "Fixed movement" : "Movement on first, second, and third recruit"}">${c.moves.map((n, i) => { const effect = contactStageEffect(card.kind, i, n); return `<span class="move ${effect.className} ${i === recruitIndex ? "next-move" : ""}" ${i === recruitIndex ? 'aria-current="step"' : ""}><small>${c.single ? "Always" : i + 1}</small>${stageEffectHtml(card.kind, i, n)}</span>`; }).join("")}</div>`;
+  return `<${tag} class="card position-card contact-${card.kind}${selectedClass}${isOpen ? " face-up" : ""}${options.static ? " static-card" : ""}" ${interaction}><div class="card-top"><span class="card-symbol">${c.symbol}</span><span class="contact-type">${isOpen ? "Revealed" : copyLabel}</span></div><div class="card-identity"><div class="card-name">${c.name}</div>${stakes ? `<span class="card-stakes">${stakes}</span>` : ""}</div><div class="card-route ${stageEffect.className !== "movement" ? `terminal-${stageEffect.className}` : ""}" aria-hidden="true"><span class="route-space route-from"><small>Now</small><b>${currentSpace}</b></span><span class="route-move ${stageEffect.className !== "movement" ? stageEffect.className : movement < 0 ? "backward" : movement === 0 ? "still" : "forward"}">${stageEffect.className === "movement" ? `<b>${movementLabel}</b><small>${movement < 0 ? "←" : movement === 0 ? "•" : "→"}</small>` : `<b>${stageEffect.icon}</b><small>${stageEffect.shortLabel}</small>`}</span><span class="route-space route-to"><small>${stageEffect.className !== "movement" ? "Outcome" : movement === 0 ? "Stays" : "Lands"}</small><b>${stageEffect.className !== "movement" ? stageEffect.shortLabel.toUpperCase() : destinationSpace}</b></span></div>${moveCurve}${selected.includes(card.id) ? `<span class="selected-mark">${isOpen ? "Shown" : "Selected"}</span>` : ""}</${tag}>`;
 }
 
 function revealCardHtml(card, wasHidden, recipient) {
@@ -461,14 +476,14 @@ function trackHtml() {
 
 function collectionHtml(player, playerIndex) {
   const entries = Object.entries(player.collection).filter(([, count]) => count);
-  return `<div class="collection"><h3>${escapeHtml(player.name)}'s network <small>Tap to inspect</small></h3><div class="chips">${entries.length ? entries.map(([kind, count]) => { const contact = CONTACTS[kind]; const nextIndex = contact.single ? 0 : Math.min(count, contact.moves.length - 1); const next = contact.moves[nextIndex]; const effect = contactStageEffect(kind, nextIndex, next); const summary = `${contact.name}: ${count} owned. Next recruit ${effect.className === "movement" ? effect.label : `means ${effect.label.toLowerCase()}`}.`; return `<button class="chip contact-chip contact-${kind}" data-contact-kind="${kind}" data-owner-index="${playerIndex}" data-summary="${summary}" title="${summary}" aria-label="${summary} View details">${contact.symbol} ${contact.name}<b>×${count}</b></button>`; }).join("") : `<span class="chip empty-chip">No contacts yet</span>`}</div></div>`;
+  return `<div class="collection"><h3>${escapeHtml(player.name)}'s network <small>Tap to inspect</small></h3><div class="chips">${entries.length ? entries.map(([kind, count]) => { const contact = CONTACTS[kind]; const nextIndex = contact.single ? 0 : Math.min(count, contact.moves.length - 1); const next = contactMovement(kind, playerIndex, nextIndex); const effect = contactStageEffect(kind, nextIndex, next); const summary = contact.ability ? `${contact.name}: ${contact.note}` : `${contact.name}: ${count} owned. Next recruit ${effect.className === "movement" ? effect.label : `means ${effect.label.toLowerCase()}`}.`; return `<button class="chip contact-chip contact-${kind}" data-contact-kind="${kind}" data-owner-index="${playerIndex}" data-summary="${summary}" title="${summary}" aria-label="${summary} View details">${contact.symbol} ${contact.name}<b>×${count}</b></button>`; }).join("") : `<span class="chip empty-chip">No contacts yet</span>`}</div></div>`;
 }
 
 function cardOutcomeText(card, playerIndex) {
   if (!card) return "an unknown outcome";
   const contact = CONTACTS[card.kind];
   const index = nextRecruitIndex(state.players, playerIndex, card.kind);
-  const movement = contact.moves[contact.single ? 0 : index];
+  const movement = contactMovement(card.kind, playerIndex, index);
   const effect = contactStageEffect(card.kind, index, movement);
   if (effect.className !== "movement") return effect.label.toLowerCase();
   return movement === 0 ? "no movement" : `${movement > 0 ? "+" : ""}${movement} ${Math.abs(movement) === 1 ? "space" : "spaces"}`;
@@ -571,7 +586,7 @@ async function shareRoom() {
 }
 
 function render() { splashVisible ? renderSplash() : state ? renderGame() : renderHome(); }
-window.render_game_to_text = () => JSON.stringify(splashVisible ? { screen: "splash", soundEnabled, connected } : state ? { screen: revealState ? "reveal" : state.phase === "lobby" ? "lobby" : state.winner !== null ? "result" : "game", mode: playMode, botProfile: playMode === "bot" ? botProfile : null, you: state.you, turn: state.turn, phase: state.phase, winner: state.winner, interceptionGap: state.players.length === 2 ? interceptionGap(state.players) : null, selected, revealed: faceUpId, exchangeMode: swapMode, exchangesRemaining: state.swapsRemaining, deckRemaining: state.deckRemaining, resolving: revealState ? { choice: revealState.choice, chosen: revealState.chosen.kind, other: revealState.other.kind, chooser: revealState.chooser } : null, movementNotice, hand: state.hand?.map(card => ({ id: card.id, kind: card.kind })), offer: state.offer ? { open: state.offer.open?.kind, concealed: true } : null, players: state.players.map(player => ({ name: player.name, progress: player.progress, collection: player.collection, connected: player.connected, ready: player.ready })) } : { screen: "home", panel: homePanel, selectedBotProfile: botProfile, connected, soundEnabled });
+window.render_game_to_text = () => JSON.stringify(splashVisible ? { screen: "splash", soundEnabled, connected } : state ? { screen: revealState ? "reveal" : state.phase === "lobby" ? "lobby" : state.winner !== null ? "result" : "game", mode: playMode, botProfile: playMode === "bot" ? botProfile : null, you: state.you, turn: state.turn, phase: state.phase, winner: state.winner, interceptionGap: state.players.length === 2 ? interceptionGap(state.players) : null, selected, revealed: faceUpId, exchangeMode: swapMode, exchangesRemaining: state.swapsRemaining, deckRemaining: state.deckRemaining, resolving: revealState ? { choice: revealState.choice, chosen: revealState.chosen.kind, other: revealState.other.kind, chooser: revealState.chooser } : null, movementNotice, hand: state.hand?.map(card => ({ id: card.id, kind: card.kind })), offer: state.offer ? { open: state.offer.open?.kind, concealed: true } : null, players: state.players.map(player => ({ name: player.name, progress: player.progress, lastMovement: player.lastMovement, collection: player.collection, connected: player.connected, ready: player.ready })) } : { screen: "home", panel: homePanel, selectedBotProfile: botProfile, connected, soundEnabled });
 window.advanceTime = () => {};
 addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; render(); });
 addEventListener("appinstalled", () => { installPrompt = null; render(); showToast("Spies in Disguise installed"); });

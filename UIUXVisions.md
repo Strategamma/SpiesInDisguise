@@ -43,3 +43,4 @@
 - Contextual bluff guidance appears only at the decision point: summarize the revealed card's public consequence and frame the concealed card as risk without suggesting its identity.
 - At two spaces from interception, the board enters a restrained danger state with one alert cue. Results include final gap, total recruits, the winning network's leading contact, and bot level when relevant.
 - While the rival prepares an offer, show the waiting player's own four-card hand as compact, non-interactive private intel. Keep it visible by default and never expose the rival's hand.
+- One-copy ability contacts replace the normal stage curve with a compact ability strip. Mimic and Slingshot always preview their live movement from public state; never leave a placeholder zero on the card.

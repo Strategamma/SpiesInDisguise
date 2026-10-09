@@ -10,10 +10,10 @@
 - Authoritative multiplayer gateway in `server/`: Node.js + `ws`, also serves `public/` for local testing or a single-service deployment.
 - The browser connects to `wss://spiesindisguise.onrender.com`; `public/config.js` can override it.
 - Rooms are ephemeral/in-memory, addressed by a six-character code. A private reconnect token is stored in local storage. No accounts or persistent personal data.
-- Online rooms use a server-authoritative lobby: both players ready, host starts, then hands are dealt. Protocol `2` retains protocol-1 compatibility.
+- Online rooms use a server-authoritative lobby: both players ready, host starts, then hands are dealt. Protocol `3` enables volatile cards; older rooms retain the core deck.
 
 ## Game rules
-Two players begin six spaces apart on one 12-space clockwise loop. The 38-card deck has six recurring contacts (six copies each) and two unique contacts. Before offering, each player may exchange a card face-down up to four times while the deck has cards. The active player offers two different contacts, one open and one concealed; a same-name pair is legal only when every hand card matches. The opponent chooses one and the active player gets the other. The recruited copy applies its signed 1st/2nd/3rd+ movement. Gaining six spaces intercepts. Three Oracles wins; three Renegades loses. Resolve all outcomes after both movements; the active player wins ties. Hands refill to four. Empty-deck play continues until the next player cannot offer two cards. Advanced-market and team variants are not implemented.
+Two players begin six spaces apart on a 12-space clockwise loop. The 38-card core has six recurring contacts (six copies each) and two unique contacts. The default 42-card deck adds one Jammer, Cleaner, Mimic, and Slingshot; paired effects resolve simultaneously from the pre-move state. Before offering, each player may exchange a card face-down up to four times. The active player offers two different contacts, one open and one concealed; a same-name pair is legal only when every hand card matches. The opponent chooses one and the active player gets the other. Recruits apply signed stage movement. Gaining six spaces intercepts. Three Oracles wins; three Renegades loses. Resolve outcomes after both movements; the active player wins ties. Empty-deck play continues until the next player cannot offer two cards. Official advanced-market and team variants are not implemented.
 
 ## Conventions
 - Server is the sole authority for hands, offers, turns, movement, and outcomes.
@@ -29,4 +29,4 @@ Two players begin six spaces apart on one 12-space clockwise loop. The 38-card d
 - Keep visible copy concise and game-native.
 
 ## Current state
-Playable 1v1 PWA with visual beginner training, three bot skill profiles, contextual bluff hints, danger feedback, match recaps, authoritative lobbies, offline modes, reconnection, installation, tested rules, gateway telemetry, and production monitoring.
+Playable 1v1 PWA with beginner training, three bot levels, bluff hints, recaps, lobbies, offline modes, reconnection, installation, tested rules, telemetry, and monitoring.

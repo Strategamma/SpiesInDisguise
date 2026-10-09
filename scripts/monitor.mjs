@@ -51,10 +51,10 @@ try {
   websocketUrl.protocol = websocketUrl.protocol === "https:" ? "wss:" : "ws:";
   const websocketStartedAt = performance.now();
   socket = await connect(websocketUrl);
-  const created = await sendAndWait(socket, { type: "create", name: "Uptime Monitor", protocol: 2 }, message => message.type === "state");
+  const created = await sendAndWait(socket, { type: "create", name: "Uptime Monitor", protocol: 3 }, message => message.type === "state");
   const websocketLatencyMs = Math.round(performance.now() - websocketStartedAt);
   const state = created.state;
-  if (state.phase !== "lobby" || state.players?.[0]?.ready !== false || state.hand?.length !== 0) throw new Error(`Gateway protocol mismatch: expected an undealt lobby, received ${state.phase}`);
+  if (state.rulesVersion !== 3 || state.phase !== "lobby" || state.players?.[0]?.ready !== false || state.hand?.length !== 0) throw new Error(`Gateway protocol mismatch: expected a rules-v3 undealt lobby, received ${state.phase}`);
   await sendAndWait(socket, { type: "leave" }, message => message.type === "left");
   socket.close();
 

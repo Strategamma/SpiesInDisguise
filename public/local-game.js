@@ -1,10 +1,10 @@
 export const LOCAL_CONTACTS = {
   courier: [1, 2, 3], analyst: [-1, 6, -1], ghost: [0, 2, 6],
   handler: [-1, -1, -2], oracle: [0, 0, 0], renegade: [2, 3, 0],
-  insider: [4], sleeper: [-3]
+  insider: [4], sleeper: [-3], jammer: [2], cleaner: [1], mimic: [0], slingshot: [0]
 };
 
-const COPIES = { courier: 6, analyst: 6, ghost: 6, handler: 6, oracle: 6, renegade: 6, insider: 1, sleeper: 1 };
+const COPIES = { courier: 6, analyst: 6, ghost: 6, handler: 6, oracle: 6, renegade: 6, insider: 1, sleeper: 1, jammer: 1, cleaner: 1, mimic: 1, slingshot: 1 };
 
 const START_GAP = 6;
 
@@ -14,7 +14,7 @@ function makeDeck(random = Math.random) {
   return deck;
 }
 
-function player(name) { return { name, hand: [], collection: {}, progress: 0, swapsRemaining: 4, connected: true }; }
+function player(name) { return { name, hand: [], collection: {}, progress: 0, lastMovement: 0, swapsRemaining: 4, connected: true }; }
 function draw(game, target) { while (target.hand.length < 4 && game.deck.length) target.hand.push(game.deck.pop()); }
 
 export function createLocalGame(mode, humanName = "Agent", random = Math.random, options = {}) {
@@ -45,18 +45,33 @@ export function localSwap(game, playerIndex, cardId) {
   active.swapsRemaining -= 1; draw(game, active);
 }
 
-function recruit(target, card) {
-  const count = (target.collection[card.kind] || 0) + 1;
-  target.collection[card.kind] = count;
-  target.progress += LOCAL_CONTACTS[card.kind][Math.min(LOCAL_CONTACTS[card.kind].length - 1, count - 1)];
+function previewMovement(game, playerIndex, card, snapshot = game.players) {
+  const player = snapshot[playerIndex];
+  if (card.kind === "mimic") return Number(player.lastMovement || 0);
+  if (card.kind === "slingshot") return player.progress < snapshot[1 - playerIndex].progress ? 5 : -2;
+  const values = LOCAL_CONTACTS[card.kind];
+  const count = Number(player.collection[card.kind] || 0) + 1;
+  return values[Math.min(values.length - 1, count - 1)];
+}
+
+function recruitPair(game, recruits) {
+  const snapshot = game.players.map(target => ({ progress: target.progress, lastMovement: target.lastMovement, collection: { ...target.collection } }));
+  const effects = recruits.map(({ playerIndex, card }) => ({ playerIndex, card, movement: previewMovement(game, playerIndex, card, snapshot) }));
+  for (const { playerIndex, card } of effects) {
+    const target = game.players[playerIndex]; target.collection[card.kind] = (target.collection[card.kind] || 0) + 1;
+  }
+  for (const { playerIndex, card, movement } of effects) {
+    const target = game.players[playerIndex]; target.progress += movement; target.lastMovement = movement;
+    if (card.kind === "jammer") game.players[1 - playerIndex].progress -= 1;
+    if (card.kind === "cleaner" && target.collection.renegade) target.collection.renegade -= 1;
+  }
 }
 
 export function localChoose(game, playerIndex, choice) {
   if (game.winner !== null || game.phase !== "choose" || !game.offer || game.offer.by === playerIndex) throw new Error("It isn’t time to choose.");
   if (!['open', 'hidden'].includes(choice)) throw new Error("Choose one of the two signals.");
   const active = game.offer.by;
-  recruit(game.players[playerIndex], game.offer[choice]);
-  recruit(game.players[active], game.offer[choice === "open" ? "hidden" : "open"]);
+  recruitPair(game, [{ playerIndex, card: game.offer[choice] }, { playerIndex: active, card: game.offer[choice === "open" ? "hidden" : "open"] }]);
   resolve(game, active); game.offer = null;
   if (game.winner === null) { game.turn = playerIndex; game.phase = "offer"; }
 }
@@ -76,13 +91,17 @@ function resolve(game, active) {
 }
 
 export function localView(game, you) {
-  return { room: game.room, mode: game.mode, you, turn: game.turn, phase: game.phase, winner: game.winner, resultReason: game.resultReason, hand: game.players[you].hand, swapsRemaining: game.players[you].swapsRemaining, deckRemaining: game.deck.length, players: game.players.map(p => ({ name: p.name, collection: p.collection, progress: p.progress, connected: true })), offer: game.offer ? { open: game.offer.open, by: game.offer.by } : null };
+  return { room: game.room, mode: game.mode, you, turn: game.turn, phase: game.phase, winner: game.winner, resultReason: game.resultReason, hand: game.players[you].hand, swapsRemaining: game.players[you].swapsRemaining, deckRemaining: game.deck.length, players: game.players.map(p => ({ name: p.name, collection: p.collection, progress: p.progress, lastMovement: p.lastMovement, connected: true })), offer: game.offer ? { open: game.offer.open, by: game.offer.by } : null };
 }
 
 function cardValue(game, playerIndex, card) {
   const player = game.players[playerIndex]; const count = (player.collection[card.kind] || 0) + 1;
   if (card.kind === "oracle" && count >= 3) return 100;
   if (card.kind === "renegade" && count >= 3) return -100;
+  if (card.kind === "jammer") return 12;
+  if (card.kind === "cleaner") return 4 + (player.collection.renegade ? 35 : 0);
+  if (card.kind === "mimic") return Number(player.lastMovement || 0) * 4;
+  if (card.kind === "slingshot") return (player.progress < game.players[1 - playerIndex].progress ? 5 : -2) * 4;
   return LOCAL_CONTACTS[card.kind][Math.min(2, count - 1)] * 4 + (card.kind === "oracle" ? count * 3 : 0);
 }
 

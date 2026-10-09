@@ -3,32 +3,36 @@ import crypto from "node:crypto";
 export const CONTACTS = {
   courier: [1, 2, 3], analyst: [-1, 6, -1], ghost: [0, 2, 6],
   handler: [-1, -1, -2], oracle: [0, 0, 0], renegade: [2, 3, 0],
-  insider: [4], sleeper: [-3]
+  insider: [4], sleeper: [-3], jammer: [2], cleaner: [1], mimic: [0], slingshot: [0]
 };
 
 const START_GAP = 6;
-const COPIES = { courier: 6, analyst: 6, ghost: 6, handler: 6, oracle: 6, renegade: 6, insider: 1, sleeper: 1 };
+const CORE_KINDS = ["courier", "analyst", "ghost", "handler", "oracle", "renegade", "insider", "sleeper"];
+const COPIES = { courier: 6, analyst: 6, ghost: 6, handler: 6, oracle: 6, renegade: 6, insider: 1, sleeper: 1, jammer: 1, cleaner: 1, mimic: 1, slingshot: 1 };
 
 export function token() { return crypto.randomBytes(18).toString("base64url"); }
 export function roomCode() { return crypto.randomBytes(4).toString("base64url").replace(/[-_]/g, "X").slice(0, 6).toUpperCase(); }
 
-export function makeDeck(random = Math.random) {
-  const deck = Object.keys(CONTACTS).flatMap(kind => Array.from({ length: COPIES[kind] }, (_, i) => ({ id: `${kind}-${i}-${crypto.randomBytes(3).toString("hex")}`, kind })));
+export function makeDeck(random = Math.random, includeVolatile = true) {
+  const kinds = includeVolatile ? Object.keys(CONTACTS) : CORE_KINDS;
+  const deck = kinds.flatMap(kind => Array.from({ length: COPIES[kind] }, (_, i) => ({ id: `${kind}-${i}-${crypto.randomBytes(3).toString("hex")}`, kind })));
   for (let i = deck.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [deck[i], deck[j]] = [deck[j], deck[i]]; }
   return deck;
 }
 
 export function newPlayer(name, protocol = 1) {
-  return { name: String(name || "Agent").trim().slice(0, 18) || "Agent", token: token(), hand: [], collection: {}, progress: 0, swapsRemaining: 4, socket: null, connected: true, ready: false, protocol: Number(protocol) || 1 };
+  return { name: String(name || "Agent").trim().slice(0, 18) || "Agent", token: token(), hand: [], collection: {}, progress: 0, lastMovement: 0, swapsRemaining: 4, socket: null, connected: true, ready: false, protocol: Number(protocol) || 1 };
 }
 
 export function newRoom(code, host) {
-  return { code, players: [host], deck: makeDeck(), turn: 0, phase: "lobby", offer: null, winner: null, resultReason: "", updatedAt: Date.now(), rematchVotes: new Set() };
+  const rulesVersion = host.protocol >= 3 ? 3 : 2;
+  return { code, players: [host], rulesVersion, deck: makeDeck(Math.random, rulesVersion >= 3), turn: 0, phase: "lobby", offer: null, winner: null, resultReason: "", updatedAt: Date.now(), rematchVotes: new Set() };
 }
 
 export function addPlayer(room, player) {
   if (room.phase !== "lobby") throw new Error("That match has already started.");
   if (room.players.length >= 2) throw new Error("That room is full.");
+  if (room.rulesVersion >= 3 && player.protocol < 3) throw new Error("Update the game before joining this room.");
   room.players.push(player);
   if (room.players.some(member => member.protocol < 2)) { room.players.forEach(member => draw(room, member)); room.phase = "offer"; }
   room.updatedAt = Date.now();
@@ -74,18 +78,35 @@ export function submitOffer(room, playerIndex, openId, hiddenId) {
   draw(room, player); room.offer = { open, hidden, by: playerIndex }; room.phase = "choose"; room.updatedAt = Date.now();
 }
 
-function recruit(player, card) {
-  const count = (player.collection[card.kind] || 0) + 1;
-  player.collection[card.kind] = count;
-  const movement = CONTACTS[card.kind][Math.min(CONTACTS[card.kind].length - 1, count - 1)];
-  player.progress += movement;
+function previewMovement(room, playerIndex, card, snapshot = room.players) {
+  const player = snapshot[playerIndex];
+  if (card.kind === "mimic") return Number(player.lastMovement || 0);
+  if (card.kind === "slingshot") return player.progress < snapshot[1 - playerIndex].progress ? 5 : -2;
+  const values = CONTACTS[card.kind];
+  const count = Number(player.collection[card.kind] || 0) + 1;
+  return values[Math.min(values.length - 1, count - 1)];
+}
+
+function recruitPair(room, recruits) {
+  const snapshot = room.players.map(player => ({ progress: player.progress, lastMovement: player.lastMovement, collection: { ...player.collection } }));
+  const effects = recruits.map(({ playerIndex, card }) => ({ playerIndex, card, movement: previewMovement(room, playerIndex, card, snapshot) }));
+  for (const { playerIndex, card } of effects) {
+    const player = room.players[playerIndex];
+    player.collection[card.kind] = (player.collection[card.kind] || 0) + 1;
+  }
+  for (const { playerIndex, card, movement } of effects) {
+    const player = room.players[playerIndex];
+    player.progress += movement; player.lastMovement = movement;
+    if (card.kind === "jammer") room.players[1 - playerIndex].progress -= 1;
+    if (card.kind === "cleaner" && player.collection.renegade) player.collection.renegade -= 1;
+  }
 }
 
 export function chooseOffer(room, playerIndex, choice) {
   if (room.winner !== null || room.phase !== "choose" || !room.offer || room.offer.by === playerIndex) throw new Error("It isn’t time to choose.");
   if (!['open', 'hidden'].includes(choice)) throw new Error("Choose one of the two signals.");
   const active = room.offer.by; const chooserCard = room.offer[choice]; const activeCard = room.offer[choice === "open" ? "hidden" : "open"];
-  recruit(room.players[playerIndex], chooserCard); recruit(room.players[active], activeCard);
+  recruitPair(room, [{ playerIndex, card: chooserCard }, { playerIndex: active, card: activeCard }]);
   resolveWinner(room, active);
   room.offer = null;
   if (room.winner === null) { room.turn = playerIndex; room.phase = "offer"; }
@@ -110,18 +131,18 @@ export function resolveWinner(room, active) {
 }
 
 export function restart(room) {
-  room.deck = makeDeck(); room.turn = 1 - room.turn; room.phase = "offer"; room.offer = null; room.winner = null; room.resultReason = ""; room.rematchVotes.clear();
-  for (const p of room.players) { p.hand = []; p.collection = {}; p.progress = 0; p.swapsRemaining = 4; draw(room, p); }
+  room.deck = makeDeck(Math.random, room.rulesVersion >= 3); room.turn = 1 - room.turn; room.phase = "offer"; room.offer = null; room.winner = null; room.resultReason = ""; room.rematchVotes.clear();
+  for (const p of room.players) { p.hand = []; p.collection = {}; p.progress = 0; p.lastMovement = 0; p.swapsRemaining = 4; draw(room, p); }
   room.updatedAt = Date.now();
 }
 
 export function viewFor(room, you) {
   const offer = room.offer ? { open: room.offer.open, by: room.offer.by } : null;
   return {
-    room: room.code, you, turn: room.turn, phase: room.phase, winner: room.winner, resultReason: room.resultReason,
+    room: room.code, rulesVersion: room.rulesVersion, you, turn: room.turn, phase: room.phase, winner: room.winner, resultReason: room.resultReason,
     hand: room.players[you].hand, swapsRemaining: room.players[you].swapsRemaining, deckRemaining: room.deck.length,
     isHost: you === 0, rematchVotes: room.rematchVotes.size, youRematch: room.rematchVotes.has(you),
-    players: room.players.map(p => ({ name: p.name, collection: p.collection, progress: p.progress, connected: p.connected, ready: p.ready })),
+    players: room.players.map(p => ({ name: p.name, collection: p.collection, progress: p.progress, lastMovement: p.lastMovement, connected: p.connected, ready: p.ready })),
     offer
   };
 }

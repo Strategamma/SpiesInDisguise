@@ -54,3 +54,14 @@ test("local exchanges preserve hand size and enforce the four-card limit", () =>
   assert.throws(() => localSwap(game, 0, game.players[0].hand[0].id), /No exchanges/);
   assert.equal(localView(game, 0).swapsRemaining, 0);
 });
+
+test("local volatile contacts match online Jammer and Mimic behavior", () => {
+  const game = createLocalGame("local", "One", () => .25);
+  game.players[0].hand = [{ id: "j", kind: "jammer" }, { id: "c", kind: "courier" }, { id: "x", kind: "oracle" }, { id: "y", kind: "handler" }];
+  localOffer(game, 0, "c", "j"); localChoose(game, 1, "open");
+  assert.equal(game.players[0].progress, 2); assert.equal(game.players[1].progress, 0);
+  game.turn = 0; game.phase = "offer"; game.players[0].lastMovement = 5;
+  game.players[0].hand = [{ id: "m", kind: "mimic" }, { id: "g", kind: "ghost" }, { id: "o", kind: "oracle" }, { id: "h", kind: "handler" }];
+  localOffer(game, 0, "g", "m"); localChoose(game, 1, "open");
+  assert.equal(game.players[0].progress, 7);
+});
