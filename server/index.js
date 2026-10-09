@@ -4,6 +4,7 @@ import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer, WebSocket } from "ws";
 import { addPlayer, chooseOffer, newPlayer, newRoom, restart, roomCode, setReady, startGame, submitOffer, swapCard, viewFor } from "./game.js";
+import { availableDuels } from "./presence.js";
 
 const processStartedAt = Date.now();
 const root = join(fileURLToPath(new URL("..", import.meta.url)), "public");
@@ -44,10 +45,15 @@ const wss = new WebSocketServer({ server, maxPayload: 4096 });
 function emit(ws, message) { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); }
 function update(room) { room.players.forEach((player, i) => emit(player.socket, { type: "state", state: viewFor(room, i), token: player.token })); }
 function fail(ws, error) { emit(ws, { type: "error", message: error instanceof Error ? error.message : "Something went wrong." }); }
+function broadcastPresence() {
+  const message = JSON.stringify({ type: "presence", duels: availableDuels(rooms) });
+  for (const client of wss.clients) if (client.readyState === WebSocket.OPEN) client.send(message);
+}
 
 wss.on("connection", ws => {
   metrics.websocketConnections += 1;
   ws.isAlive = true; ws.on("pong", () => { ws.isAlive = true; });
+  emit(ws, { type: "presence", duels: availableDuels(rooms) });
   ws.on("message", raw => {
     let message;
     try {
@@ -55,14 +61,14 @@ wss.on("connection", ws => {
       if (message.type === "create") {
         if (rooms.size >= maxRooms) throw new Error("The gateway is at room capacity.");
         let code; do { code = roomCode(); } while (rooms.has(code));
-        const player = newPlayer(message.name, message.protocol); player.socket = ws; const room = newRoom(code, player); rooms.set(code, room); metrics.roomsCreated += 1; ws.identity = { code, index: 0 }; update(room);
+        const player = newPlayer(message.name, message.protocol); player.socket = ws; const room = newRoom(code, player); room.public = message.public === true; rooms.set(code, room); metrics.roomsCreated += 1; ws.identity = { code, index: 0 }; update(room); broadcastPresence();
       } else if (message.type === "join") {
         const code = String(message.room || "").toUpperCase(); const room = rooms.get(code); if (!room) throw new Error("Room not found.");
         const reconnect = room.players.findIndex(p => p.token === message.token);
         let index = reconnect;
         if (reconnect >= 0) { room.players[reconnect].socket = ws; room.players[reconnect].connected = true; }
         else { const player = newPlayer(message.name, message.protocol); player.socket = ws; addPlayer(room, player); index = room.players.length - 1; }
-        ws.identity = { code, index }; update(room);
+        ws.identity = { code, index }; update(room); broadcastPresence();
       } else {
         if (!ws.identity) throw new Error("Join a room first.");
         const room = rooms.get(ws.identity.code); if (!room) throw new Error("Room expired."); const i = ws.identity.index;
@@ -72,7 +78,7 @@ wss.on("connection", ws => {
             if (i === 0) { room.players.slice(1).forEach(other => emit(other.socket, { type: "room_closed" })); rooms.delete(room.code); }
             else { room.players.splice(i, 1); update(room); }
           } else if (player?.socket === ws) { player.connected = false; player.socket = null; update(room); }
-          ws.identity = null; emit(ws, { type: "left" }); return;
+          ws.identity = null; emit(ws, { type: "left" }); broadcastPresence(); return;
         }
         if (message.type === "ready") setReady(room, i, message.ready);
         else if (message.type === "start") startGame(room, i);
@@ -96,10 +102,10 @@ wss.on("connection", ws => {
     }
   });
   ws.on("error", error => { metrics.websocketErrors += 1; log("websocket_error", { error: error.message }); });
-  ws.on("close", () => { metrics.websocketCloses += 1; if (!ws.identity) return; const room = rooms.get(ws.identity.code); const player = room?.players[ws.identity.index]; if (player?.socket === ws) { player.connected = false; if (room.phase === "lobby") player.ready = false; update(room); } });
+  ws.on("close", () => { metrics.websocketCloses += 1; if (!ws.identity) return; const room = rooms.get(ws.identity.code); const player = room?.players[ws.identity.index]; if (player?.socket === ws) { player.connected = false; if (room.phase === "lobby") player.ready = false; update(room); broadcastPresence(); } });
 });
 wss.on("error", error => { metrics.websocketErrors += 1; log("websocket_server_error", { error: error.message }); });
 
-const heartbeat = setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) ws.terminate(); else { ws.isAlive = false; ws.ping(); } } const expiry = Date.now() - 1000 * 60 * 60 * 6; for (const [code, room] of rooms) if (room.updatedAt < expiry) { rooms.delete(code); metrics.roomsExpired += 1; } }, 30000);
+const heartbeat = setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) ws.terminate(); else { ws.isAlive = false; ws.ping(); } } const expiry = Date.now() - 1000 * 60 * 60 * 6; let changed = false; for (const [code, room] of rooms) if (room.updatedAt < expiry) { rooms.delete(code); metrics.roomsExpired += 1; changed = true; } if (changed) broadcastPresence(); }, 30000);
 wss.on("close", () => clearInterval(heartbeat));
 server.listen(port, "0.0.0.0", () => { startupDurationMs = Date.now() - processStartedAt; log("server_ready", { port, startupDurationMs, version: healthSnapshot().version }); });

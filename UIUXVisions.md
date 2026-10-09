@@ -6,7 +6,7 @@
 - Mobile is action-first: mode cards stack, gameplay keeps the current decision and hand above secondary collections, and controls respect safe areas.
 - Pass-and-play must protect hidden information with explicit handoff screens before a different player sees their decision.
 - Bot and in-person modes work entirely offline; Wi-Fi remains server-authoritative.
-- Visual direction: covert signal room—near-black navy, mint signal glow, amber intelligence markers, tight typography, and restrained scanning motion.
+- Visual direction: Decadence crossover—near-black warm grid, cream type, bold red statements, orange actions, green live signals, tight typography, and restrained scanning motion. Preserve the game’s covert identity inside the shared arcade language.
 - Brand mark: a flat geometric question-mark card with one restrained violet card shadow; no decorative patterns, rings, gradients, or extra card details. Retain a safe navy field for maskable app icons.
 - Every turn must clearly state whose device/player action is expected. Honor reduced-motion settings.
 - Home onboarding uses a short briefing entry plus a visible three-step How to Play preview; the full briefing explains the offer/choose/recruit loop, all win conditions, and the contact dossier.
@@ -18,6 +18,7 @@
 - Launch uses a branded, tap-to-enter signal splash; that gesture safely enables optional synthesized game audio. A persistent header control stores the sound preference. Motion remains restrained and honors reduced-motion settings.
 - Larger motion is event-driven, not render-driven: stagger hands only when dealt/exchanged, slide offers only when sent, confirm lobby readiness, pop recruited network chips, and emphasize terminal outcomes. Ordinary selection stays immediate; animate transforms/opacity and honor reduced motion globally.
 - Online rooms open into an explicit lobby with two agent slots, room sharing, connected/ready status, individual ready controls, and a host-only launch button. No cards are dealt before launch.
+- The home screen shows a compact live-duel board. Public hosts opt in; only connected, single-player lobbies appear. Private code rooms stay undiscoverable.
 - Results use distinct mission-complete and mission-compromised treatments. Celebration effects never cover rematch or Home actions, and online rematch voting reports its waiting state.
 
 # Card decision feedback

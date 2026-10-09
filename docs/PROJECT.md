@@ -9,7 +9,7 @@
 - `public/local-game.js` powers offline Bot and privacy-gated pass-and-play modes; Wi-Fi mode continues to use the authoritative server.
 - Authoritative multiplayer gateway in `server/`: Node.js + `ws`, also serves `public/` for local testing or a single-service deployment.
 - The browser connects to `wss://spiesindisguise.onrender.com`; `public/config.js` can override it.
-- Rooms are ephemeral/in-memory, addressed by a six-character code. A private reconnect token is stored in local storage. No accounts or persistent personal data.
+- Ephemeral rooms use six-character codes. Opt-in public lobbies expose only the connected waiting host’s codename and room code; private rooms stay undiscoverable. Reconnect tokens are local. No accounts or persistent personal data.
 - Online rooms use a server-authoritative lobby: both players ready, host starts, then hands are dealt. Protocol `3` enables volatile cards; older rooms retain the core deck.
 
 ## Game rules
@@ -29,4 +29,4 @@ Two players begin six spaces apart on a 12-space clockwise loop. The 38-card cor
 - Keep visible copy concise and game-native.
 
 ## Current state
-Playable 1v1 PWA with beginner training, three bot levels, bluff hints, recaps, lobbies, offline modes, reconnection, installation, tested rules, telemetry, and monitoring.
+Playable 1v1 PWA with training, bots, offline modes, public/private lobbies, reconnection, telemetry, and monitoring.
