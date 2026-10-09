@@ -53,3 +53,7 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 - Replaced persistent card descriptions with an immediate route preview: recipient’s current board space, signed movement/direction, and projected landing space. Negative, zero, wraparound, and recipient-specific positions share tested projection logic.
 - Kept identity, copy stage, special Oracle/Renegade stakes, and a compact movement curve visible. Full descriptions remain in accessible labels/tooltips and existing dossiers. Concealed cards now use shorter action copy.
 - Bumped the offline cache to v8. Seventeen tests, syntax, CSS/manifest structure, diff hygiene, and local health pass. Chromium installed successfully for the required screenshot loop, but macOS denied its Mach rendezvous service, so no screenshot was produced and manual visual QA remains required.
+
+## 2026-10-09 — Terminal card icons
+- Replaced Oracle’s third-stage zero with a mint star/Win outcome and Renegade’s with a red cross/Lose outcome on playable cards, route previews, Rules, public dossiers, network summaries, and post-recruit board feedback. Movement math remains zero internally.
+- Bumped the offline cache to v9. Eighteen automated tests pass, including direct outcome-display assertions. Playwright remains blocked at Chromium launch by the macOS Mach rendezvous permission, so screenshot inspection remains manual.

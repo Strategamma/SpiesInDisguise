@@ -6,6 +6,13 @@ export function nextRecruitIndex(players, playerIndex, kind) {
 export const BOARD_SPACES = 12;
 export const START_GAP = 6;
 
+export function contactStageEffect(kind, index, movement) {
+  if (index === 2 && kind === "oracle") return { icon: "★", label: "Victory", shortLabel: "Win", className: "victory" };
+  if (index === 2 && kind === "renegade") return { icon: "✕", label: "Defeat", shortLabel: "Lose", className: "defeat" };
+  const value = `${movement > 0 ? "+" : ""}${movement}`;
+  return { icon: value, label: `${value} movement`, shortLabel: "", className: "movement" };
+}
+
 export function boardPosition(playerIndex, progress) {
   const position = playerIndex * START_GAP + Number(progress || 0);
   return ((position % BOARD_SPACES) + BOARD_SPACES) % BOARD_SPACES;

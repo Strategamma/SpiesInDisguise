@@ -1,5 +1,5 @@
 import { chooseBotCard, chooseBotOffer, createLocalGame, localChoose, localOffer, localSwap, localView } from "./local-game.js";
-import { BOARD_SPACES, boardPosition, interceptionGap, nextRecruitIndex, projectedCardPosition, recruitMovementNotice } from "./ui-logic.js";
+import { BOARD_SPACES, boardPosition, contactStageEffect, interceptionGap, nextRecruitIndex, projectedCardPosition, recruitMovementNotice } from "./ui-logic.js";
 
 const CONTACTS = {
   courier: { name: "Courier", symbol: "◈", moves: [1, 2, 3], note: "Reliable progress with every recruit." },
@@ -11,6 +11,11 @@ const CONTACTS = {
   insider: { name: "Insider", symbol: "↑", moves: [4], note: "A unique contact that moves four spaces forward.", single: true },
   sleeper: { name: "Sleeper", symbol: "↓", moves: [-3], note: "A unique contact that moves three spaces backward.", single: true }
 };
+
+function stageEffectHtml(kind, index, movement) {
+  const effect = contactStageEffect(kind, index, movement);
+  return `<b class="effect-${effect.className}" aria-label="${effect.label}">${effect.icon}</b>${effect.shortLabel ? `<span class="outcome-label">${effect.shortLabel}</span>` : ""}`;
+}
 
 const app = document.querySelector("#app");
 const toast = document.querySelector("#toast");
@@ -192,7 +197,7 @@ function leaveDialog() {
 }
 
 function rulesDialog() {
-  const dossier = Object.entries(CONTACTS).map(([kind, contact]) => `<div class="legend-item contact-${kind}"><div class="legend-symbol">${contact.symbol}</div><div><b>${contact.name}</b><span>${contact.note}</span><div class="mini-moves">${contact.moves.map((movement, index) => `<span><small>${contact.single ? "Always" : `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`}</small>${movement > 0 ? "+" : ""}${movement}</span>`).join("")}</div></div></div>`).join("");
+  const dossier = Object.entries(CONTACTS).map(([kind, contact]) => `<div class="legend-item contact-${kind}"><div class="legend-symbol">${contact.symbol}</div><div><b>${contact.name}</b><span>${contact.note}</span><div class="mini-moves">${contact.moves.map((movement, index) => `<span class="${contactStageEffect(kind, index, movement).className}"><small>${contact.single ? "Always" : `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`}</small>${stageEffectHtml(kind, index, movement)}</span>`).join("")}</div></div></div>`).join("");
   return `<dialog id="rules" class="rules-dialog">
     <div class="dialog-head"><div><span class="eyebrow">Field briefing</span><h2>How to play</h2></div><button class="dialog-close" data-close-rules aria-label="Close rules">×</button></div>
     <p class="rules-intro">Bluff with two contacts, read your rival, and catch them on the loop.</p>
@@ -224,8 +229,7 @@ function openContactDetail(button) {
   if (!player || !contact) return;
   const count = player.collection[kind] || 0;
   const nextIndex = contact.single ? 0 : Math.min(count, contact.moves.length - 1);
-  const movement = value => `${value > 0 ? "+" : ""}${value}`;
-  const stages = contact.moves.map((value, index) => `<span class="detail-move ${index === nextIndex ? "next" : ""}"><small>${contact.single ? "Always" : `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`}</small><b>${movement(value)}</b>${index === nextIndex ? "<em>Next recruit</em>" : ""}</span>`).join("");
+  const stages = contact.moves.map((value, index) => `<span class="detail-move ${contactStageEffect(kind, index, value).className} ${index === nextIndex ? "next" : ""}"><small>${contact.single ? "Always" : `${index + 1}${index === 0 ? "st" : index === 1 ? "nd" : "rd"}`}</small>${stageEffectHtml(kind, index, value)}${index === nextIndex ? "<em>Next recruit</em>" : ""}</span>`).join("");
   const dialog = document.querySelector("#contact-detail");
   dialog.querySelector("[data-contact-content]").innerHTML = `<div class="contact-detail-title contact-${kind}"><span>${contact.symbol}</span><div><small>${escapeHtml(player.name)} owns ${count}</small><h3>${contact.name}</h3></div></div><p>${contact.note}</p><div class="detail-moves">${stages}</div><p class="detail-foot">${contact.single ? "This unique contact always uses the same effect." : count >= 3 ? "Further copies keep using the 3rd effect." : `The next copy uses the ${nextIndex + 1}${nextIndex === 0 ? "st" : nextIndex === 1 ? "nd" : "rd"} effect.`}</p>`;
   dialog.showModal();
@@ -377,14 +381,15 @@ function cardHtml(card, options = {}) {
   const playerIndex = options.playerIndex ?? state.you;
   const recruitIndex = nextRecruitIndex(state.players, playerIndex, card.kind);
   const movement = c.moves[c.single ? 0 : recruitIndex];
+  const stageEffect = contactStageEffect(card.kind, recruitIndex, movement);
   const { current: currentSpace, destination: destinationSpace } = projectedCardPosition(state.players, playerIndex, movement);
   const copyLabel = c.single ? "Unique" : `${recruitIndex + 1}${recruitIndex === 0 ? "st" : recruitIndex === 1 ? "nd" : "rd"}+ copy`;
   const stakes = card.kind === "oracle" ? "3rd wins" : card.kind === "renegade" ? "3rd loses" : "";
   const movementLabel = `${movement > 0 ? "+" : ""}${movement}`;
   const tag = options.static ? "div" : "button";
-  const label = `${c.name}. ${copyLabel}. From space ${currentSpace} to space ${destinationSpace}, ${movementLabel} movement. ${c.note}`;
+  const label = `${c.name}. ${copyLabel}. ${stageEffect.className === "movement" ? `From space ${currentSpace} to space ${destinationSpace}, ${movementLabel} movement.` : `${stageEffect.label} on recruit.`} ${c.note}`;
   const interaction = options.static ? `aria-label="${label}"` : `${options.attr || ""} data-card="${card.id}" aria-pressed="${selected.includes(card.id)}" aria-label="${label}" title="${c.note}"`;
-  return `<${tag} class="card position-card contact-${card.kind}${selectedClass}${isOpen ? " face-up" : ""}${options.static ? " static-card" : ""}" ${interaction}><div class="card-top"><span class="card-symbol">${c.symbol}</span><span class="contact-type">${isOpen ? "Revealed" : copyLabel}</span></div><div class="card-identity"><div class="card-name">${c.name}</div>${stakes ? `<span class="card-stakes">${stakes}</span>` : ""}</div><div class="card-route" aria-hidden="true"><span class="route-space route-from"><small>Now</small><b>${currentSpace}</b></span><span class="route-move ${movement < 0 ? "backward" : movement === 0 ? "still" : "forward"}"><b>${movementLabel}</b><small>${movement < 0 ? "←" : movement === 0 ? "•" : "→"}</small></span><span class="route-space route-to"><small>${movement === 0 ? "Stays" : "Lands"}</small><b>${destinationSpace}</b></span></div><div class="card-moves ${c.single ? "single-move" : ""}" aria-label="${c.single ? "Fixed movement" : "Movement on first, second, and third recruit"}">${c.moves.map((n, i) => `<span class="move ${i === recruitIndex ? "next-move" : ""}" ${i === recruitIndex ? 'aria-current="step"' : ""}><small>${c.single ? "Always" : i + 1}</small><b>${n > 0 ? "+" : ""}${n}</b></span>`).join("")}</div>${selected.includes(card.id) ? `<span class="selected-mark">${isOpen ? "Shown" : "Selected"}</span>` : ""}</${tag}>`;
+  return `<${tag} class="card position-card contact-${card.kind}${selectedClass}${isOpen ? " face-up" : ""}${options.static ? " static-card" : ""}" ${interaction}><div class="card-top"><span class="card-symbol">${c.symbol}</span><span class="contact-type">${isOpen ? "Revealed" : copyLabel}</span></div><div class="card-identity"><div class="card-name">${c.name}</div>${stakes ? `<span class="card-stakes">${stakes}</span>` : ""}</div><div class="card-route ${stageEffect.className !== "movement" ? `terminal-${stageEffect.className}` : ""}" aria-hidden="true"><span class="route-space route-from"><small>Now</small><b>${currentSpace}</b></span><span class="route-move ${stageEffect.className !== "movement" ? stageEffect.className : movement < 0 ? "backward" : movement === 0 ? "still" : "forward"}">${stageEffect.className === "movement" ? `<b>${movementLabel}</b><small>${movement < 0 ? "←" : movement === 0 ? "•" : "→"}</small>` : `<b>${stageEffect.icon}</b><small>${stageEffect.shortLabel}</small>`}</span><span class="route-space route-to"><small>${stageEffect.className !== "movement" ? "Outcome" : movement === 0 ? "Stays" : "Lands"}</small><b>${stageEffect.className !== "movement" ? stageEffect.shortLabel.toUpperCase() : destinationSpace}</b></span></div><div class="card-moves ${c.single ? "single-move" : ""}" aria-label="${c.single ? "Fixed movement" : "Movement on first, second, and third recruit"}">${c.moves.map((n, i) => { const effect = contactStageEffect(card.kind, i, n); return `<span class="move ${effect.className} ${i === recruitIndex ? "next-move" : ""}" ${i === recruitIndex ? 'aria-current="step"' : ""}><small>${c.single ? "Always" : i + 1}</small>${stageEffectHtml(card.kind, i, n)}</span>`; }).join("")}</div>${selected.includes(card.id) ? `<span class="selected-mark">${isOpen ? "Shown" : "Selected"}</span>` : ""}</${tag}>`;
 }
 
 function revealCardHtml(card, wasHidden, recipient) {
@@ -426,14 +431,14 @@ function trackHtml() {
   const gap = interceptionGap(state.players);
   const nodes = Array.from({ length: BOARD_SPACES }, (_, i) => { const point = position(-90 + i * (360 / BOARD_SPACES)); const home = i === 0 ? " start-a" : i === 6 ? " start-b" : ""; return `<i class="orbit-node route${home}" style="--x:${point.x}%;--y:${point.y}%"><small>${i + 1}</small>${home ? `<em>${i === 0 ? "A" : "B"}</em>` : ""}</i>`; }).join("");
   const moved = player => `${player.progress > 0 ? "+" : ""}${player.progress} moved`;
-  const movement = movementNotice ? `<div class="movement-notice" role="status" aria-live="polite">${movementNotice.map(({ playerIndex, kind, delta }) => `<span class="movement-chip contact-${kind}"><i>${CONTACTS[kind].symbol}</i><b>${escapeHtml(state.players[playerIndex].name)}</b><small>${CONTACTS[kind].name} · ${delta > 0 ? "+" : ""}${delta} ${delta === 1 || delta === -1 ? "space" : "spaces"}</small></span>`).join("")}</div>` : "";
+  const movement = movementNotice ? `<div class="movement-notice" role="status" aria-live="polite">${movementNotice.map(({ playerIndex, kind, delta }) => { const index = Math.min(2, Math.max(0, Number(state.players[playerIndex].collection[kind] || 1) - 1)); const effect = contactStageEffect(kind, index, delta); const result = effect.className === "movement" ? `${delta > 0 ? "+" : ""}${delta} ${delta === 1 || delta === -1 ? "space" : "spaces"}` : effect.label; return `<span class="movement-chip contact-${kind}"><i>${effect.className === "movement" ? CONTACTS[kind].symbol : effect.icon}</i><b>${escapeHtml(state.players[playerIndex].name)}</b><small>${CONTACTS[kind].name} · ${result}</small></span>`; }).join("")}</div>` : "";
   const movedPlayers = new Set(movementNotice?.map(item => item.playerIndex) || []);
   return `<div class="orbit-wrap" role="img" aria-label="Twelve-space clockwise pursuit board. Agents are ${gap} relative spaces from interception."><div class="orbit-caption"><b>Clockwise chase</b><span>Gain 6 spaces on your rival</span></div><div class="orbit-board"><div class="orbit-ring"></div>${nodes}<div class="orbit-direction" aria-hidden="true">↻</div><div class="orbit-agent agent-a ${movedPlayers.has(0) ? "just-moved" : ""}" style="--x:${a.x}%;--y:${a.y}%"><span>A</span></div><div class="orbit-agent agent-b ${movedPlayers.has(1) ? "just-moved" : ""}" style="--x:${b.x}%;--y:${b.y}%"><span>B</span></div><div class="orbit-center"><strong>${gap}</strong><span>spaces gained<br>to intercept</span></div></div>${movement}<div class="orbit-legend"><span><i class="agent-dot a"></i><b>${escapeHtml(state.players[0].name)}</b><small>Space ${positions[0] + 1} · ${moved(state.players[0])}</small></span><span><i class="agent-dot b"></i><b>${escapeHtml(state.players[1].name)}</b><small>Space ${positions[1] + 1} · ${moved(state.players[1])}</small></span></div></div>`;
 }
 
 function collectionHtml(player, playerIndex) {
   const entries = Object.entries(player.collection).filter(([, count]) => count);
-  return `<div class="collection"><h3>${escapeHtml(player.name)}'s network <small>Tap to inspect</small></h3><div class="chips">${entries.length ? entries.map(([kind, count]) => { const contact = CONTACTS[kind]; const next = contact.moves[contact.single ? 0 : Math.min(count, contact.moves.length - 1)]; const summary = `${contact.name}: ${count} owned. Next recruit ${next > 0 ? "+" : ""}${next}.`; return `<button class="chip contact-chip contact-${kind}" data-contact-kind="${kind}" data-owner-index="${playerIndex}" data-summary="${summary}" title="${summary}" aria-label="${summary} View details">${contact.symbol} ${contact.name}<b>×${count}</b></button>`; }).join("") : `<span class="chip empty-chip">No contacts yet</span>`}</div></div>`;
+  return `<div class="collection"><h3>${escapeHtml(player.name)}'s network <small>Tap to inspect</small></h3><div class="chips">${entries.length ? entries.map(([kind, count]) => { const contact = CONTACTS[kind]; const nextIndex = contact.single ? 0 : Math.min(count, contact.moves.length - 1); const next = contact.moves[nextIndex]; const effect = contactStageEffect(kind, nextIndex, next); const summary = `${contact.name}: ${count} owned. Next recruit ${effect.className === "movement" ? effect.label : `means ${effect.label.toLowerCase()}`}.`; return `<button class="chip contact-chip contact-${kind}" data-contact-kind="${kind}" data-owner-index="${playerIndex}" data-summary="${summary}" title="${summary}" aria-label="${summary} View details">${contact.symbol} ${contact.name}<b>×${count}</b></button>`; }).join("") : `<span class="chip empty-chip">No contacts yet</span>`}</div></div>`;
 }
 
 function renderGame() {
