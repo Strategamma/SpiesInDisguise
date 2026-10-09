@@ -1,14 +1,14 @@
 # Goal
-Add polished, purposeful animation across the match without slowing decisions or obscuring game state.
+Add actionable production monitoring for uptime, cold-start latency, WebSocket failures, and room-creation failures.
 
 # Scope
-Animate card dealing/offers, selection feedback, turn transitions, board resolution, lobby readiness, public-network updates, dialogs, and terminal outcomes without changing gameplay.
+Instrument the gateway, expose a safe aggregate health snapshot, add structured logs, and schedule an external HTTP/WebSocket smoke check through GitHub Actions.
 
 # Approach
-Use transient motion cues tied to actual state changes so full card/panel entrances do not replay on every selection render. Prefer transforms and opacity, retain existing reveal/result sequences, and provide a complete reduced-motion fallback.
+Keep monitoring dependency-free except for the existing WebSocket client. Record counters without room codes, tokens, names, or card data. The external check measures wake latency, validates the current lobby protocol by creating and deleting a room, and fails above a configurable threshold.
 
 # Risks
-Replaying entrance motion on every click, excessive continuous movement, layout-shifting properties, timer leakage, mobile performance, and reduced-motion gaps.
+Leaking player data, monitors leaving rooms behind, false failures during deployments, using internal process timing as cold-start latency, and checks silently passing against an outdated gateway.
 
 # Verification
-Test cue selection and expiry, rules/syntax/CSS checks, serve assets, attempt the browser screenshot loop, and record any visual-QA blocker.
+Run the monitor against a local gateway, force a WebSocket/protocol failure to confirm counters, run the full test suite, validate workflow syntax, and inspect the health payload for safe fields.

@@ -62,3 +62,8 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 - Added staggered hand deals, paired offer entrances, next-effect focus, card lift/press feedback, turn sweeps, action-bar arrival, ready confirmation, recruited-network pops, dialog entrances, delayed movement chips, and terminal-outcome emphasis. Existing board travel, concealed flips, transfers, and results remain the strongest sequences.
 - Motion cues derive from meaningful state transitions and are consumed after one render, preventing full entrances from replaying during ordinary card selection. Global reduced-motion handling remains intact.
 - Bumped the offline cache to v10. Nineteen tests pass, including motion-cue selection/idle behavior; syntax, CSS structure, local health, and diff checks pass. Playwright remains blocked by the macOS Mach rendezvous permission, so motion screenshot inspection remains manual.
+
+## 2026-10-09 — Production gateway monitoring
+- Expanded `/health` with version, uptime/startup duration, capacity, active room/socket gauges, and aggregate connection/error/room counters. WebSocket server, socket, protocol, and room-capacity failures now emit structured JSON logs without player or room identifiers.
+- Added an hourly/manual GitHub Actions monitor that measures HTTP cold-start latency, verifies a real protocol-2 WebSocket lobby, cleans up its room, and fails on health/protocol errors or latency above 30 seconds. `MONITOR_URL`, timeout, and threshold are configurable.
+- Verified the monitor completes against a local gateway, removes its room, exposes safe counters, increments malformed-message errors, and records a forced room-capacity failure. Full tests and syntax checks remain required before completion.

@@ -9,3 +9,5 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22
+      - key: MAX_ROOMS
+        value: 1000

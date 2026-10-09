@@ -29,6 +29,20 @@ window.SPIES_IN_DISGUISE_GATEWAY = "wss://YOUR-SERVICE.onrender.com";
 
 Render's free service may sleep when idle, so the first connection can take a little longer. Room data is intentionally temporary and disappears when the service restarts.
 
+## Monitoring
+
+`GET /health` returns deployment version, process uptime/startup time, active room and WebSocket counts, and aggregate counters for connections, socket errors, message errors, room creation failures, and expirations. Logs are structured JSON and intentionally exclude room codes, names, reconnect tokens, and card data.
+
+The `Monitor production gateway` GitHub Actions workflow runs hourly and can also be started manually. It records HTTP wake latency, opens a real WebSocket, creates a protocol-2 lobby, validates that hands remain undealt, and removes the monitor room. The job fails on health/protocol errors or when health latency exceeds 30 seconds.
+
+Run the same check locally or against another deployment:
+
+```bash
+MONITOR_URL=http://localhost:3000 MAX_COLD_START_MS=1000 npm run monitor
+```
+
+Configure GitHub Actions failure notifications in the repository/account settings so a failed scheduled run reaches the maintainers.
+
 ## Notes
 
 - No account or database is required.

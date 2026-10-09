@@ -29,4 +29,4 @@ Two players begin six spaces apart on one 12-space clockwise loop. The 38-card d
 - Keep visible copy concise and game-native.
 
 ## Current state
-Playable 1v1 PWA with splash, sound, authoritative lobbies, state-aware motion, navigation, guided circular board, inspectable networks, recruit feedback, offline Bot/pass-and-play, reconnection, installation, caching, tested rules, and a live Render gateway.
+Playable 1v1 PWA with authoritative lobbies, state-aware motion, guided board, inspectable networks, offline modes, reconnection, installation, caching, tested rules, structured gateway telemetry, an hourly production smoke check, and a live Render gateway.
