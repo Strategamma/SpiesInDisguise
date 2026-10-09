@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { boardPosition, contactStageEffect, interceptionGap, nextRecruitIndex, projectedCardPosition, recruitMovementNotice } from "../public/ui-logic.js";
+import { boardPosition, contactStageEffect, interceptionGap, nextRecruitIndex, projectedCardPosition, recruitMovementNotice, stateMotionCue } from "../public/ui-logic.js";
 
 test("card preview highlights the next applicable recruitment stage", () => {
   const players = [{ collection: {} }, { collection: { courier: 1, ghost: 2, oracle: 5 } }];
@@ -32,6 +32,15 @@ test("third Oracle and Renegade stages show outcomes instead of zero movement", 
   assert.deepEqual(contactStageEffect("oracle", 2, 0), { icon: "★", label: "Victory", shortLabel: "Win", className: "victory" });
   assert.deepEqual(contactStageEffect("renegade", 2, 0), { icon: "✕", label: "Defeat", shortLabel: "Lose", className: "defeat" });
   assert.deepEqual(contactStageEffect("ghost", 0, 0), { icon: "0", label: "0 movement", shortLabel: "", className: "movement" });
+});
+
+test("motion cues only fire for meaningful game-state changes", () => {
+  const base = { phase: "offer", winner: null, hand: [{ id: "a" }], players: [{ ready: false }, { ready: false }] };
+  assert.equal(stateMotionCue(base, { ...base, phase: "choose" }), "offer");
+  assert.equal(stateMotionCue(base, { ...base, hand: [{ id: "b" }] }), "deal");
+  assert.equal(stateMotionCue(base, { ...base, players: [{ ready: true }, { ready: false }] }), "ready");
+  assert.equal(stateMotionCue(base, { ...base, winner: 0 }), "result");
+  assert.equal(stateMotionCue(base, structuredClone(base)), null);
 });
 
 test("recruit feedback maps each revealed card to its recipient and movement", () => {

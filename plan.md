@@ -1,14 +1,14 @@
 # Goal
-Make card decisions readable at a glance by prioritizing the recipient’s current and projected board position over explanatory copy.
+Add polished, purposeful animation across the match without slowing decisions or obscuring game state.
 
 # Scope
-Redesign visible hand, offer, waiting, and reveal cards without changing rules, selection flow, concealed information, or responsive match structure.
+Animate card dealing/offers, selection feedback, turn transitions, board resolution, lobby readiness, public-network updates, dialogs, and terminal outcomes without changing gameplay.
 
 # Approach
-Replace persistent descriptions with a large position route: current space, signed movement, and destination space. Keep copy stage and the three-step curve compact, preserve full descriptions in accessible labels/tooltips and existing dossiers, and tune mobile/landscape density.
+Use transient motion cues tied to actual state changes so full card/panel entrances do not replay on every selection render. Prefer transforms and opacity, retain existing reveal/result sequences, and provide a complete reduced-motion fallback.
 
 # Risks
-Showing the wrong recipient position, confusing negative or zero movement, selected/revealed badges obscuring the route, narrow-card overflow, and reducing accessibility while removing visible prose.
+Replaying entrance motion on every click, excessive continuous movement, layout-shifting properties, timer leakage, mobile performance, and reduced-motion gaps.
 
 # Verification
-Test position wrapping and recipient-specific previews, run rules/syntax/CSS checks, serve assets, attempt the browser screenshot loop, and record any visual-QA blocker.
+Test cue selection and expiry, rules/syntax/CSS checks, serve assets, attempt the browser screenshot loop, and record any visual-QA blocker.

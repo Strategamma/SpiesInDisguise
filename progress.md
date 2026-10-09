@@ -57,3 +57,8 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 ## 2026-10-09 — Terminal card icons
 - Replaced Oracle’s third-stage zero with a mint star/Win outcome and Renegade’s with a red cross/Lose outcome on playable cards, route previews, Rules, public dossiers, network summaries, and post-recruit board feedback. Movement math remains zero internally.
 - Bumped the offline cache to v9. Eighteen automated tests pass, including direct outcome-display assertions. Playwright remains blocked at Chromium launch by the macOS Mach rendezvous permission, so screenshot inspection remains manual.
+
+## 2026-10-09 — State-aware game motion
+- Added staggered hand deals, paired offer entrances, next-effect focus, card lift/press feedback, turn sweeps, action-bar arrival, ready confirmation, recruited-network pops, dialog entrances, delayed movement chips, and terminal-outcome emphasis. Existing board travel, concealed flips, transfers, and results remain the strongest sequences.
+- Motion cues derive from meaningful state transitions and are consumed after one render, preventing full entrances from replaying during ordinary card selection. Global reduced-motion handling remains intact.
+- Bumped the offline cache to v10. Nineteen tests pass, including motion-cue selection/idle behavior; syntax, CSS structure, local health, and diff checks pass. Playwright remains blocked by the macOS Mach rendezvous permission, so motion screenshot inspection remains manual.

@@ -1,5 +1,5 @@
 import { chooseBotCard, chooseBotOffer, createLocalGame, localChoose, localOffer, localSwap, localView } from "./local-game.js";
-import { BOARD_SPACES, boardPosition, contactStageEffect, interceptionGap, nextRecruitIndex, projectedCardPosition, recruitMovementNotice } from "./ui-logic.js";
+import { BOARD_SPACES, boardPosition, contactStageEffect, interceptionGap, nextRecruitIndex, projectedCardPosition, recruitMovementNotice, stateMotionCue } from "./ui-logic.js";
 
 const CONTACTS = {
   courier: { name: "Courier", symbol: "◈", moves: [1, 2, 3], note: "Reliable progress with every recruit." },
@@ -43,6 +43,7 @@ let revealTimer = null;
 let revealComplete = null;
 let movementNotice = null;
 let movementTimer = null;
+let motionCue = null;
 let landscapePromptDismissed = false;
 const REVEAL_DURATION = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 350 : 1450;
 
@@ -90,6 +91,7 @@ async function playSound(name) {
 
 function applyState(next) {
   const previous = state;
+  motionCue = stateMotionCue(previous, next);
   state = next;
   if (!previous || splashVisible) return;
   const movementChanged = previous.players?.some((player, index) => player.progress !== next.players?.[index]?.progress);
@@ -320,6 +322,7 @@ function startLocal(mode) {
   playMode = mode;
   const name = localStorage.getItem("spies-name") || localStorage.getItem("shadow-name") || "Player One";
   localGame = createLocalGame(mode, name);
+  motionCue = "deal";
   localHandoff = mode === "local";
   state = localView(localGame, 0);
   history.replaceState({}, "", location.pathname);
@@ -413,7 +416,7 @@ function playerBox(player, index) {
   return `<div class="player ${index === state.you ? "you" : ""} ${player.ready ? "ready" : ""}"><div class="player-name">${escapeHtml(player.name)}${index === state.you ? " · you" : ""}</div><div class="player-meta">${meta}</div></div>`;
 }
 
-function lobbyHtml() {
+function lobbyHtml(activeMotion = null) {
   const me = state.players[state.you];
   const canStart = state.isHost && state.players.length === 2 && state.players.every(player => player.connected && player.ready);
   const slots = [0, 1].map(index => {
@@ -421,7 +424,7 @@ function lobbyHtml() {
     return player ? `<article class="lobby-agent ${player.ready ? "ready" : ""}"><span class="lobby-avatar">${index === 0 ? "A" : "B"}</span><div><b>${escapeHtml(player.name)}${index === 0 ? " · Host" : ""}</b><small>${player.connected ? player.ready ? "Ready for briefing" : "Choosing loadout" : "Reconnecting…"}</small></div><span class="ready-light"></span></article>` : `<article class="lobby-agent empty"><span class="lobby-avatar">?</span><div><b>Open agent slot</b><small>Share the room code to invite a rival</small></div><span class="ready-light"></span></article>`;
   }).join("");
   const hostAction = state.isHost ? `<button class="primary launch-button" id="start-match" ${canStart ? "" : "disabled"}>${state.players.length < 2 ? "Waiting for rival" : canStart ? "Launch mission" : "Waiting for both agents"}</button>` : `<div class="lobby-wait"><span class="signal-mini"></span>${state.players.length < 2 ? "Waiting for another agent" : "The host will launch when both agents are ready"}</div>`;
-  return `<section class="lobby-panel"><div class="lobby-heading"><span class="eyebrow">Secure lobby</span><h2>Assemble your team</h2><p>Both agents must be connected and ready before the host can launch.</p></div><div class="lobby-code"><span>Room code</span><strong>${state.room}</strong><button class="icon-btn" id="share" aria-label="Share room invitation">⧉</button></div><div class="lobby-agents">${slots}</div><button class="ready-button ${me.ready ? "is-ready" : ""}" id="toggle-ready"><span>${me.ready ? "✓" : "○"}</span>${me.ready ? "Ready—tap to cancel" : "Mark me ready"}</button>${hostAction}</section>`;
+  return `<section class="lobby-panel ${activeMotion === "ready" ? "ready-change" : ""}"><div class="lobby-heading"><span class="eyebrow">Secure lobby</span><h2>Assemble your team</h2><p>Both agents must be connected and ready before the host can launch.</p></div><div class="lobby-code"><span>Room code</span><strong>${state.room}</strong><button class="icon-btn" id="share" aria-label="Share room invitation">⧉</button></div><div class="lobby-agents">${slots}</div><button class="ready-button ${me.ready ? "is-ready" : ""}" id="toggle-ready"><span>${me.ready ? "✓" : "○"}</span>${me.ready ? "Ready—tap to cancel" : "Mark me ready"}</button>${hostAction}</section>`;
 }
 
 function trackHtml() {
@@ -442,12 +445,14 @@ function collectionHtml(player, playerIndex) {
 }
 
 function renderGame() {
+  const activeMotion = motionCue;
+  motionCue = null;
   const active = state.turn === state.you;
   const choosing = state.phase === "choose" && !active;
   const waitingForRival = state.phase === "choose" && active;
   let playArea = "";
   if (playMode === "wifi" && state.phase === "lobby") {
-    playArea = lobbyHtml();
+    playArea = lobbyHtml(activeMotion);
   } else if (localHandoff && playMode === "local") {
     playArea = `<div class="panel handoff"><div class="handoff-icon">↻</div><span class="eyebrow">Pass the device</span><h2>${escapeHtml(state.players[state.you].name)}, you’re up.</h2><p class="lede">Make sure the other player has looked away before continuing.</p><button class="primary" id="ready-player">I’m ready</button></div>`;
   } else if (state.winner !== null) {
@@ -461,15 +466,15 @@ function renderGame() {
   } else if (state.players.length < 2) {
     playArea = `<div class="panel waiting"><div class="signal"></div><h2>Waiting for a rival</h2><p class="lede">Share the room code or invitation link. The match begins as soon as they connect.</p><button class="primary" id="share">Share invitation</button></div>`;
   } else if (choosing) {
-    playArea = `<div class="stage"><span class="turn-pill">Your decision</span><h2>Which contact do you take?</h2><p>You recruit your choice. Your rival gets the other card.</p></div><div class="offer">${cardHtml(state.offer.open, { attr: 'data-choice="open"' })}${cardHtml(null, { concealed: true })}</div>`;
+    playArea = `<div class="stage"><span class="turn-pill">Your decision</span><h2>Which contact do you take?</h2><p>You recruit your choice. Your rival gets the other card.</p></div><div class="offer ${activeMotion === "offer" ? "animate-offer" : ""}">${cardHtml(state.offer.open, { attr: 'data-choice="open"' })}${cardHtml(null, { concealed: true })}</div>`;
   } else if (waitingForRival) {
-    playArea = `<div class="stage"><span class="turn-pill waiting-pill">Offer sent</span><h2>Your rival is choosing</h2><p>The concealed contact stays secret until they decide.</p></div><div class="offer">${cardHtml(state.offer.open, { static: true, playerIndex: 1 - state.you })}${cardHtml(null, { concealed: true, static: true })}</div>`;
+    playArea = `<div class="stage"><span class="turn-pill waiting-pill">Offer sent</span><h2>Your rival is choosing</h2><p>The concealed contact stays secret until they decide.</p></div><div class="offer ${activeMotion === "offer" ? "animate-offer" : ""}">${cardHtml(state.offer.open, { static: true, playerIndex: 1 - state.you })}${cardHtml(null, { concealed: true, static: true })}</div>`;
   } else if (active) {
     const swaps = state.swapsRemaining ?? 0;
     const canSwap = swaps > 0 && state.deckRemaining > 0 && selected.length === 0;
     const instruction = swapMode ? "Tap one contact to exchange it face down." : selected.length < 2 ? "Choose two different contacts." : faceUpId ? "Ready—send one revealed and one concealed." : "Now tap either selected card to reveal it.";
     const hint = swapMode ? `Exchange available · ${swaps} remaining` : selected.length < 2 ? "Step 1 · Choose two contacts" : faceUpId ? `Revealing ${CONTACTS[state.hand.find(c => c.id === faceUpId).kind].name}` : "Step 2 · Choose which card to reveal";
-    playArea = `<div class="stage"><span class="turn-pill">Your turn</span><h2>${swapMode ? "Exchange a contact" : "Build your offer"}</h2><p>${instruction}</p></div><div class="hand-label"><span>Your hand</span><span>${swapMode ? `${swaps}/4 exchanges left` : `${selected.length}/2 chosen`}</span></div><div class="hand ${swapMode ? "swap-mode" : ""}">${state.hand.map(card => cardHtml(card)).join("")}</div><div class="action-bar"><p class="selection-hint">${hint}</p><div class="action-buttons"><button class="secondary" id="swap-card" ${swapMode || canSwap ? "" : "disabled"}>${swapMode ? "Cancel exchange" : `Exchange · ${swaps} left`}</button><button class="primary" id="offer" ${!swapMode && selected.length === 2 && faceUpId ? "" : "disabled"}>Send this offer</button></div></div>`;
+    playArea = `<div class="stage"><span class="turn-pill">Your turn</span><h2>${swapMode ? "Exchange a contact" : "Build your offer"}</h2><p>${instruction}</p></div><div class="hand-label"><span>Your hand</span><span>${swapMode ? `${swaps}/4 exchanges left` : `${selected.length}/2 chosen`}</span></div><div class="hand ${swapMode ? "swap-mode" : ""} ${activeMotion === "deal" ? "animate-deal" : ""}">${state.hand.map(card => cardHtml(card)).join("")}</div><div class="action-bar"><p class="selection-hint">${hint}</p><div class="action-buttons"><button class="secondary" id="swap-card" ${swapMode || canSwap ? "" : "disabled"}>${swapMode ? "Cancel exchange" : `Exchange · ${swaps} left`}</button><button class="primary" id="offer" ${!swapMode && selected.length === 2 && faceUpId ? "" : "disabled"}>Send this offer</button></div></div>`;
   } else {
     playArea = `<div class="panel waiting"><div class="signal"></div><h2>${escapeHtml(state.players[state.turn].name)} is preparing an offer</h2><p class="lede">Watch their network. The card they need may be the one they show you.</p></div>`;
   }
@@ -481,8 +486,8 @@ function renderGame() {
     app.innerHTML = shell(`${matchStatus}<div class="game-layout lobby-layout" id="play-area"><section>${playArea}</section></div>`) + revealOverlayHtml();
   } else {
     const board = state.players.length === 2 ? trackHtml() : "";
-    const networks = state.players.length === 2 ? `<aside class="network-panel" aria-label="Agent networks"><div class="collections">${state.players.map(collectionHtml).join("")}</div></aside>` : "";
-    app.innerHTML = shell(`<div class="match-layout ${state.winner !== null ? "is-result" : ""}">${matchStatus}<div class="board-panel">${board}</div><section class="play-column" id="play-area"><div class="play-content">${playArea}</div></section>${networks}</div>`) + revealOverlayHtml();
+    const networks = state.players.length === 2 ? `<aside class="network-panel ${movementNotice ? "network-updated" : ""}" aria-label="Agent networks"><div class="collections">${state.players.map(collectionHtml).join("")}</div></aside>` : "";
+    app.innerHTML = shell(`<div class="match-layout ${state.winner !== null ? "is-result" : ""}">${matchStatus}<div class="board-panel">${board}</div><section class="play-column motion-${activeMotion || "steady"}" id="play-area"><div class="play-content">${playArea}</div></section>${networks}</div>`) + revealOverlayHtml();
   }
   bindCommon();
   document.querySelector("#ready-player")?.addEventListener("click", () => { playSound("turn"); localHandoff = false; render(); });

@@ -13,6 +13,15 @@ export function contactStageEffect(kind, index, movement) {
   return { icon: value, label: `${value} movement`, shortLabel: "", className: "movement" };
 }
 
+export function stateMotionCue(previous, next) {
+  if (!previous || !next) return null;
+  if (previous.winner === null && next.winner !== null) return "result";
+  if (previous.phase !== next.phase) return next.phase === "choose" ? "offer" : next.phase === "offer" ? "deal" : "phase";
+  if (previous.hand && next.hand && previous.hand.map(card => card.id).join() !== next.hand.map(card => card.id).join()) return "deal";
+  if (previous.players?.some((player, index) => player.ready !== next.players?.[index]?.ready)) return "ready";
+  return null;
+}
+
 export function boardPosition(playerIndex, progress) {
   const position = playerIndex * START_GAP + Number(progress || 0);
   return ((position % BOARD_SPACES) + BOARD_SPACES) % BOARD_SPACES;

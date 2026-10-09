@@ -16,6 +16,7 @@
 - The pursuit board is one numbered 12-space clockwise loop. Agents start opposite each other, six spaces apart, and both move in the same direction. The center shows the remaining relative gap; the legend shows each board space and signed net movement.
 - Primary navigation is a persistent three-item dock: Home, Play, and Rules. Play jumps to mode selection or the current decision, active location is explicit, and leaving an unfinished match always requires confirmation.
 - Launch uses a branded, tap-to-enter signal splash; that gesture safely enables optional synthesized game audio. A persistent header control stores the sound preference. Motion remains restrained and honors reduced-motion settings.
+- Larger motion is event-driven, not render-driven: stagger hands only when dealt/exchanged, slide offers only when sent, confirm lobby readiness, pop recruited network chips, and emphasize terminal outcomes. Ordinary selection stays immediate; animate transforms/opacity and honor reduced motion globally.
 - Online rooms open into an explicit lobby with two agent slots, room sharing, connected/ready status, individual ready controls, and a host-only launch button. No cards are dealt before launch.
 - Results use distinct mission-complete and mission-compromised treatments. Celebration effects never cover rematch or Home actions, and online rematch voting reports its waiting state.
 
