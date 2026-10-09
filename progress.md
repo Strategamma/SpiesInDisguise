@@ -67,3 +67,13 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 - Expanded `/health` with version, uptime/startup duration, capacity, active room/socket gauges, and aggregate connection/error/room counters. WebSocket server, socket, protocol, and room-capacity failures now emit structured JSON logs without player or room identifiers.
 - Added an hourly/manual GitHub Actions monitor that measures HTTP cold-start latency, verifies a real protocol-2 WebSocket lobby, cleans up its room, and fails on health/protocol errors or latency above 30 seconds. `MONITOR_URL`, timeout, and threshold are configurable.
 - Verified the monitor completes against a local gateway, removes its room, exposes safe counters, increments malformed-message errors, and records a forced room-capacity failure. Full tests and syntax checks remain required before completion.
+
+## 2026-10-09 — Beginner training and excitement pass
+- Added three offline SVG walkthrough screenshots to Rules for offer-building, choosing, and the clockwise chase; the service worker cache is now v11.
+- Added Rookie, Field Agent, and Mastermind solo profiles. Higher profiles account more strongly for both public networks without receiving concealed information or changing rules.
+- Added contextual bluff guidance, a two-space danger presentation with sound/haptics, and a finale recap for chase gap, recruits, leading winning contact, and bot level.
+- Twenty automated tests, syntax, SVG parsing/rendering, static serving, health, cache coverage, and diff checks pass. The required Playwright attempt remains blocked at Chromium launch by macOS Mach-port permission denial, so full-page responsive screenshot QA remains manual.
+
+## 2026-10-09 — Waiting-hand visibility
+- Added a compact, non-interactive view of the player's own four cards while the rival prepares an offer, including current movement stage and projected landing space. It is responsive in portrait and short landscape and remains private in online and local state views.
+- Bumped the offline cache to v12. Targeted privacy coverage and the full test suite pass; Playwright visual QA remains blocked by the macOS Chromium permission restriction.

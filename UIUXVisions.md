@@ -38,3 +38,8 @@
 - The action surface owns the turn heading, hand or offer, and confirmation control. Its width and card grid must remain stable from 320px phones through wide desktop windows.
 - Mobile matches prefer landscape. Installed PWAs declare landscape-primary; supported browsers request an orientation lock after the player's start gesture, while unsupported portrait contexts show a focused rotate prompt.
 - The board labels clockwise direction, the six-space objective, both starting nodes, current positions, and signed net movement without requiring the rules dialog.
+- Beginner help starts with three image-led examples—build an offer, choose a contact, close the gap—before detailed rules. Keep each caption action-focused and cache the artwork for offline use.
+- Solo setup offers Rookie, Field Agent, and Mastermind profiles. Difficulty changes decision quality, never rules or hidden-information access.
+- Contextual bluff guidance appears only at the decision point: summarize the revealed card's public consequence and frame the concealed card as risk without suggesting its identity.
+- At two spaces from interception, the board enters a restrained danger state with one alert cue. Results include final gap, total recruits, the winning network's leading contact, and bot level when relevant.
+- While the rival prepares an offer, show the waiting player's own four-card hand as compact, non-interactive private intel. Keep it visible by default and never expose the rival's hand.

@@ -19,6 +19,21 @@ test("bot always offers a legal pair and returns a valid choice", () => {
   assert.ok(["open", "hidden"].includes(chooseBotCard(game)));
 });
 
+test("bot profiles stay legal and the mastermind accounts for the rival network", () => {
+  const game = createLocalGame("bot", "One", () => .2, { botName: "Viper Bot" });
+  assert.equal(game.players[1].name, "Viper Bot");
+  game.players[0].collection.analyst = 1;
+  game.offer = { by: 0, open: { id: "a", kind: "courier" }, hidden: { id: "b", kind: "analyst" } };
+  game.phase = "choose";
+  assert.equal(chooseBotCard(game, "rookie"), "open");
+  assert.equal(chooseBotCard(game, "mastermind"), "hidden");
+  game.phase = "offer"; game.turn = 1; game.offer = null;
+  for (const profile of ["rookie", "balanced", "mastermind"]) {
+    const offer = chooseBotOffer(game, profile);
+    assert.ok(offer.openId && offer.hiddenId && offer.openId !== offer.hiddenId);
+  }
+});
+
 test("local chase uses the same six-space relative interception rule", () => {
   const game = createLocalGame("local", "One", () => .3);
   game.players[0].progress = 5;

@@ -17,8 +17,8 @@ function makeDeck(random = Math.random) {
 function player(name) { return { name, hand: [], collection: {}, progress: 0, swapsRemaining: 4, connected: true }; }
 function draw(game, target) { while (target.hand.length < 4 && game.deck.length) target.hand.push(game.deck.pop()); }
 
-export function createLocalGame(mode, humanName = "Agent", random = Math.random) {
-  const opponent = mode === "bot" ? "Cipher Bot" : "Player Two";
+export function createLocalGame(mode, humanName = "Agent", random = Math.random, options = {}) {
+  const opponent = mode === "bot" ? (options.botName || "Cipher Bot") : "Player Two";
   const game = { mode, room: mode === "bot" ? "BOT" : "LOCAL", players: [player(humanName), player(opponent)], deck: makeDeck(random), turn: 0, phase: "offer", offer: null, winner: null, resultReason: "" };
   game.players.forEach(p => draw(game, p));
   return game;
@@ -86,20 +86,31 @@ function cardValue(game, playerIndex, card) {
   return LOCAL_CONTACTS[card.kind][Math.min(2, count - 1)] * 4 + (card.kind === "oracle" ? count * 3 : 0);
 }
 
-export function chooseBotOffer(game) {
+function botWeight(profile) {
+  return profile === "rookie" ? 0 : profile === "mastermind" ? .8 : .35;
+}
+
+export function chooseBotOffer(game, profile = "balanced") {
   const hand = game.players[1].hand;
+  const weight = botWeight(profile);
   let best = null;
   for (let i = 0; i < hand.length; i++) for (let j = i + 1; j < hand.length; j++) {
     if (hand[i].kind === hand[j].kind && hand.some(c => c.kind !== hand[i].kind)) continue;
-    const low = Math.min(cardValue(game, 1, hand[i]), cardValue(game, 1, hand[j]));
-    if (!best || low > best.score) best = { openId: hand[i].id, hiddenId: hand[j].id, score: low };
+    const firstOutcome = cardValue(game, 1, hand[j]) - cardValue(game, 0, hand[i]) * weight;
+    const secondOutcome = cardValue(game, 1, hand[i]) - cardValue(game, 0, hand[j]) * weight;
+    const score = Math.min(firstOutcome, secondOutcome);
+    const firstLooksSafer = cardValue(game, 0, hand[i]) <= cardValue(game, 0, hand[j]);
+    const open = profile === "mastermind" && !firstLooksSafer ? hand[j] : hand[i];
+    const hidden = open === hand[i] ? hand[j] : hand[i];
+    if (!best || score > best.score) best = { openId: open.id, hiddenId: hidden.id, score };
   }
   return best;
 }
 
-export function chooseBotCard(game) {
+export function chooseBotCard(game, profile = "balanced") {
   const bot = 1; const open = game.offer.open; const hidden = game.offer.hidden;
-  const openScore = cardValue(game, bot, open) - cardValue(game, 0, hidden) * .35;
-  const hiddenScore = cardValue(game, bot, hidden) - cardValue(game, 0, open) * .35;
+  const weight = botWeight(profile);
+  const openScore = cardValue(game, bot, open) - cardValue(game, 0, hidden) * weight;
+  const hiddenScore = cardValue(game, bot, hidden) - cardValue(game, 0, open) * weight;
   return hiddenScore > openScore ? "hidden" : "open";
 }

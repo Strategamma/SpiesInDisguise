@@ -37,6 +37,8 @@ test("chooser recruits selected card and turn passes", () => {
   assert.equal(room.players[1].collection.courier, 1); assert.equal(room.players[1].progress, 1);
   assert.equal(room.players[0].collection.ghost, 1); assert.equal(room.players[0].progress, 0);
   assert.equal(room.turn, 1); assert.equal(room.phase, "offer");
+  assert.equal(viewFor(room, 0).hand.length, 4, "the waiting player keeps a private hand view");
+  assert.notDeepEqual(viewFor(room, 0).hand, viewFor(room, 1).hand, "players never receive each other's hands");
 });
 
 test("the deck has the complete 38-card movement balance", () => {
