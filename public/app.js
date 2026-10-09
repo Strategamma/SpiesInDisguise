@@ -1,5 +1,5 @@
 import { chooseBotCard, chooseBotOffer, createLocalGame, localChoose, localOffer, localSwap, localView } from "./local-game.js";
-import { BOARD_SPACES, boardPosition, interceptionGap, nextRecruitIndex, recruitMovementNotice } from "./ui-logic.js";
+import { BOARD_SPACES, boardPosition, interceptionGap, nextRecruitIndex, projectedCardPosition, recruitMovementNotice } from "./ui-logic.js";
 
 const CONTACTS = {
   courier: { name: "Courier", symbol: "◈", moves: [1, 2, 3], note: "Reliable progress with every recruit." },
@@ -369,16 +369,22 @@ function cardHtml(card, options = {}) {
   if (options.concealed) {
     const tag = options.static ? "div" : "button";
     const interaction = options.static ? "" : 'data-choice="hidden" aria-label="Choose concealed contact"';
-    return `<${tag} class="card concealed${options.static ? " static-card" : ""}" ${interaction}><div class="card-back-mark">?</div><div class="card-name">Unknown contact</div><div class="card-effect">${options.static ? "Identity hidden until the decision is made." : "Choose to reveal and recruit this agent."}</div><span class="card-choice">${options.static ? "Concealed" : "Choose concealed"}</span></${tag}>`;
+    return `<${tag} class="card concealed${options.static ? " static-card" : ""}" ${interaction}><div class="card-back-mark">?</div><div class="card-name">Concealed</div><span class="concealed-hint">${options.static ? "Reveals after choice" : "Tap to recruit"}</span><span class="card-choice">${options.static ? "Hidden" : "Choose"}</span></${tag}>`;
   }
   const c = CONTACTS[card.kind];
   const selectedClass = selected.includes(card.id) ? " selected" : "";
   const isOpen = faceUpId === card.id;
   const playerIndex = options.playerIndex ?? state.you;
   const recruitIndex = nextRecruitIndex(state.players, playerIndex, card.kind);
+  const movement = c.moves[c.single ? 0 : recruitIndex];
+  const { current: currentSpace, destination: destinationSpace } = projectedCardPosition(state.players, playerIndex, movement);
+  const copyLabel = c.single ? "Unique" : `${recruitIndex + 1}${recruitIndex === 0 ? "st" : recruitIndex === 1 ? "nd" : "rd"}+ copy`;
+  const stakes = card.kind === "oracle" ? "3rd wins" : card.kind === "renegade" ? "3rd loses" : "";
+  const movementLabel = `${movement > 0 ? "+" : ""}${movement}`;
   const tag = options.static ? "div" : "button";
-  const interaction = options.static ? "" : `${options.attr || ""} data-card="${card.id}" aria-pressed="${selected.includes(card.id)}"`;
-  return `<${tag} class="card contact-${card.kind}${selectedClass}${isOpen ? " face-up" : ""}${options.static ? " static-card" : ""}" ${interaction}><div class="card-top"><span class="card-symbol">${c.symbol}</span>${isOpen ? `<span class="open-badge">Revealed</span>` : `<span class="contact-type">${c.single ? "Unique" : "Contact"}</span>`}</div><div class="card-name">${c.name}</div><div class="card-effect">${c.note}</div><div class="card-moves ${c.single ? "single-move" : ""}" aria-label="${c.single ? "Fixed movement" : "Movement on first, second, and third recruit"}">${c.moves.map((n, i) => `<span class="move ${i === recruitIndex ? "next-move" : ""}" ${i === recruitIndex ? 'aria-current="step"' : ""}><small>${c.single ? "Always" : `${i + 1}${i === 0 ? "st" : i === 1 ? "nd" : "rd"}`}</small><b>${n > 0 ? "+" : ""}${n}</b>${i === recruitIndex ? "<em>Next</em>" : ""}</span>`).join("")}</div>${selected.includes(card.id) ? `<span class="selected-mark">${isOpen ? "Shown" : "Selected"}</span>` : ""}</${tag}>`;
+  const label = `${c.name}. ${copyLabel}. From space ${currentSpace} to space ${destinationSpace}, ${movementLabel} movement. ${c.note}`;
+  const interaction = options.static ? `aria-label="${label}"` : `${options.attr || ""} data-card="${card.id}" aria-pressed="${selected.includes(card.id)}" aria-label="${label}" title="${c.note}"`;
+  return `<${tag} class="card position-card contact-${card.kind}${selectedClass}${isOpen ? " face-up" : ""}${options.static ? " static-card" : ""}" ${interaction}><div class="card-top"><span class="card-symbol">${c.symbol}</span><span class="contact-type">${isOpen ? "Revealed" : copyLabel}</span></div><div class="card-identity"><div class="card-name">${c.name}</div>${stakes ? `<span class="card-stakes">${stakes}</span>` : ""}</div><div class="card-route" aria-hidden="true"><span class="route-space route-from"><small>Now</small><b>${currentSpace}</b></span><span class="route-move ${movement < 0 ? "backward" : movement === 0 ? "still" : "forward"}"><b>${movementLabel}</b><small>${movement < 0 ? "←" : movement === 0 ? "•" : "→"}</small></span><span class="route-space route-to"><small>${movement === 0 ? "Stays" : "Lands"}</small><b>${destinationSpace}</b></span></div><div class="card-moves ${c.single ? "single-move" : ""}" aria-label="${c.single ? "Fixed movement" : "Movement on first, second, and third recruit"}">${c.moves.map((n, i) => `<span class="move ${i === recruitIndex ? "next-move" : ""}" ${i === recruitIndex ? 'aria-current="step"' : ""}><small>${c.single ? "Always" : i + 1}</small><b>${n > 0 ? "+" : ""}${n}</b></span>`).join("")}</div>${selected.includes(card.id) ? `<span class="selected-mark">${isOpen ? "Shown" : "Selected"}</span>` : ""}</${tag}>`;
 }
 
 function revealCardHtml(card, wasHidden, recipient) {

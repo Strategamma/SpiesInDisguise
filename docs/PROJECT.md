@@ -25,6 +25,7 @@ Two players begin six spaces apart on one 12-space clockwise loop. The 38-card d
 - Board position is cumulative movement modulo 12; player two starts at index 6. Relative movement of ±6 triggers interception.
 - Installed mobile PWA orientation is landscape-primary; browsers that cannot lock orientation receive an in-match rotate prompt.
 - Live matches use one status/board/action/network layout: a two-column table from 900px and action-led flow below it.
+- Cards prioritize current space, signed movement, and landing space; descriptions stay in tooltips, accessibility labels, and dossiers.
 - Keep visible copy concise and game-native.
 
 ## Current state

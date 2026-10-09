@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { boardPosition, interceptionGap, nextRecruitIndex, recruitMovementNotice } from "../public/ui-logic.js";
+import { boardPosition, interceptionGap, nextRecruitIndex, projectedCardPosition, recruitMovementNotice } from "../public/ui-logic.js";
 
 test("card preview highlights the next applicable recruitment stage", () => {
   const players = [{ collection: {} }, { collection: { courier: 1, ghost: 2, oracle: 5 } }];
@@ -19,6 +19,13 @@ test("board positions share one twelve-space clockwise loop with a six-space gap
   assert.equal(interceptionGap([{ progress: 0 }, { progress: 0 }]), 6);
   assert.equal(interceptionGap([{ progress: 4 }, { progress: 1 }]), 3);
   assert.equal(interceptionGap([{ progress: -2 }, { progress: 4 }]), 0);
+});
+
+test("card previews project the correct recipient from current to destination space", () => {
+  const players = [{ progress: 11 }, { progress: -2 }];
+  assert.deepEqual(projectedCardPosition(players, 0, 2), { current: 12, destination: 2 });
+  assert.deepEqual(projectedCardPosition(players, 1, -3), { current: 5, destination: 2 });
+  assert.deepEqual(projectedCardPosition(players, 1, 0), { current: 5, destination: 5 });
 });
 
 test("recruit feedback maps each revealed card to its recipient and movement", () => {

@@ -11,6 +11,14 @@ export function boardPosition(playerIndex, progress) {
   return ((position % BOARD_SPACES) + BOARD_SPACES) % BOARD_SPACES;
 }
 
+export function projectedCardPosition(players, playerIndex, movement) {
+  const progress = Number(players?.[playerIndex]?.progress || 0);
+  return {
+    current: boardPosition(playerIndex, progress) + 1,
+    destination: boardPosition(playerIndex, progress + Number(movement || 0)) + 1
+  };
+}
+
 export function interceptionGap(players) {
   const difference = Math.abs(Number(players?.[0]?.progress || 0) - Number(players?.[1]?.progress || 0));
   return Math.max(0, START_GAP - difference);

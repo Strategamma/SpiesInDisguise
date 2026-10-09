@@ -10,7 +10,7 @@
 - Brand mark: a flat geometric question-mark card with one restrained violet card shadow; no decorative patterns, rings, gradients, or extra card details. Retain a safe navy field for maskable app icons.
 - Every turn must clearly state whose device/player action is expected. Honor reduced-motion settings.
 - Home onboarding uses a short briefing entry plus a visible three-step How to Play preview; the full briefing explains the offer/choose/recruit loop, all win conditions, and the contact dossier.
-- Cards prioritize identity, plain-language behavior, and labeled 1st/2nd/3rd recruitment movement. Contact color is supportive rather than the only identifier; selection and revealed states use text labels.
+- Cards prioritize identity and board consequence: current space, signed movement, and landing space. The compact 1st/2nd/3rd curve remains secondary; longer behavior copy lives in tooltips, accessibility labels, Rules, and network dossiers. Contact color is supportive rather than the only identifier; selection and revealed states use text labels.
 - Mobile hands use a two-column grid so all four contacts remain scannable without horizontal discovery. The sticky action bar always states the current offer-building step.
 - The pursuit board is one numbered 12-space clockwise loop. Agents start opposite each other, six spaces apart, and both move in the same direction. The center shows the remaining relative gap; the legend shows each board space and signed net movement.
 - Primary navigation is a persistent three-item dock: Home, Play, and Rules. Play jumps to mode selection or the current decision, active location is explicit, and leaving an unfinished match always requires confirmation.

@@ -48,3 +48,8 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 - Added post-reveal board feedback showing each recipient, recruited contact, and signed movement; moved agents pulse on the loop. The board now labels direction, objective, and both start nodes.
 - Public network chips show ownership counts, provide hover summaries, and open a tap/click dossier with the full movement curve and highlighted next effect. No private hand or concealed card data is exposed.
 - Sixteen automated tests, syntax, CSS/manifest structure, diff hygiene, and local health/assets pass. Automated visual QA remains unavailable: Playwright has no browser binary and the browser UI blocks localhost by saved policy, so phone/tablet visual inspection is still manual.
+
+## 2026-10-09 — Position-first card UI
+- Replaced persistent card descriptions with an immediate route preview: recipient’s current board space, signed movement/direction, and projected landing space. Negative, zero, wraparound, and recipient-specific positions share tested projection logic.
+- Kept identity, copy stage, special Oracle/Renegade stakes, and a compact movement curve visible. Full descriptions remain in accessible labels/tooltips and existing dossiers. Concealed cards now use shorter action copy.
+- Bumped the offline cache to v8. Seventeen tests, syntax, CSS/manifest structure, diff hygiene, and local health pass. Chromium installed successfully for the required screenshot loop, but macOS denied its Mach rendezvous service, so no screenshot was produced and manual visual QA remains required.
