@@ -82,3 +82,10 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 - Confirmed the complete 38-card core is represented by renamed Spies in Disguise contacts. Added four original one-copy contacts: Jammer (+2 and rival −1), Cleaner (+1 and removes one Renegade), Mimic (repeats the user's previous movement), and Slingshot (+5 while behind, −2 while tied/ahead).
 - Implemented simultaneous, pre-move-state resolution in both authoritative Wi‑Fi and offline engines; added live card/dossier previews, public ability labels, bot valuation, protocol-3 room compatibility, and cache v13.
 - Twenty-three automated tests, syntax, and a real protocol-3 local HTTP/WebSocket monitor pass. Chromium was installed to a writable temporary cache, but macOS again denied its Mach rendezvous service, so responsive screenshot inspection remains manual.
+
+## 2026-10-10 — Interaction clarity and feedback
+- Audited home/setup, lobby, handoff, offer, exchange, choose, waiting, rules, results, navigation, playable cards, and public-network controls.
+- Added shared semantic button feedback: mint primary, navy secondary, quiet, and danger treatments; consistent hover lift, press compression, keyboard focus, disabled states, and interaction sounds. Live presence controls receive the same binding when inserted after render.
+- Added explicit lobby progress (room → rival → ready), offer progress (choose two → reveal one → send), state-specific card labels, action-led instructions, clearer disabled-button copy, and a concise next action in `render_game_to_text`.
+- Bumped the offline cache to v16. Twenty-five automated tests, JavaScript syntax, interaction-source audit, and diff hygiene pass.
+- Installed Playwright Chromium under a writable temporary cache, but macOS denied its Mach rendezvous service at launch. Automated screenshots remain blocked; manual responsive visual/audio QA is still required.

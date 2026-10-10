@@ -6,7 +6,7 @@
 - Mobile is action-first: mode cards stack, gameplay keeps the current decision and hand above secondary collections, and controls respect safe areas.
 - Pass-and-play must protect hidden information with explicit handoff screens before a different player sees their decision.
 - Bot and in-person modes work entirely offline; Wi-Fi remains server-authoritative.
-- Visual direction: Decadence crossover—near-black warm grid, cream type, bold red statements, orange actions, green live signals, tight typography, and restrained scanning motion. Preserve the game’s covert identity inside the shared arcade language.
+- Visual direction: modern covert signal room—near-black navy grid, cool white type, mint signals, amber intelligence markers, violet depth, tight typography, and restrained scanning motion. Share the host site’s bold hierarchy and polish without copying its palette or branding.
 - Brand mark: a flat geometric question-mark card with one restrained violet card shadow; no decorative patterns, rings, gradients, or extra card details. Retain a safe navy field for maskable app icons.
 - Every turn must clearly state whose device/player action is expected. Honor reduced-motion settings.
 - Home onboarding uses a short briefing entry plus a visible three-step How to Play preview; the full briefing explains the offer/choose/recruit loop, all win conditions, and the contact dossier.
@@ -32,6 +32,9 @@
 - Mode cards are compact decision rows on every viewport: icon, title/context, then a clearly aligned affordance. Recommendations must never compete with the title.
 - The persistent navigation uses a restrained tinted active state; primary game actions, not navigation chrome, carry the strongest filled treatment.
 - Secondary information uses higher-contrast muted text, while panels rely on spacing and thin borders instead of oversized empty areas.
+- All controls share four semantic treatments: mint primary, navy outlined secondary, transparent quiet, and red danger. Hover lifts, press compresses, keyboard focus uses a mint ring, and disabled copy explains the missing prerequisite.
+- Interaction audio is consistent: restrained hover ticks on precise pointers, select tones for choices, and distinct offer/start/turn cues. The saved mute preference and reduced-motion preference always win.
+- Multi-step decisions expose their progress. Offer building reads Choose 2 → Pick revealed → Send offer; the lobby reads Room created → Invite rival → Ready up.
 
 # Match layout
 - Treat the live match as one game table, not unrelated stacked panels. Desktop uses a compact left rail for status, pursuit board, and networks beside the active decision surface.

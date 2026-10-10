@@ -1,14 +1,14 @@
 # Goal
-Unify the game with Decadence Inc.’s visual language and make live two-device duels immediately discoverable from the home screen.
+Make every interaction visually consistent, responsive, audible, and self-explanatory so a first-time player can complete a match without guessing.
 
 # Scope
-Restyle the shared shell/home surface, retain Bot/Pass & Play/private rooms, add opt-in public duel hosting and a compact live-agent board backed by the existing authoritative gateway.
+Audit home, setup, lobby, offer, choose, exchange, waiting, handoff, rules, dialogs, results, navigation, cards, and public-network controls. Preserve game rules and networking.
 
 # Approach
-Use the site’s black grid, warm cream, red/orange accents, bold display type, outlined headline, and restrained glow. Extend the WebSocket protocol with public-lobby presence snapshots and direct join actions; never expose hands, tokens, or active matches.
+Define one button system with clear primary/secondary/quiet/danger/selected states; route interaction sounds through shared delegation; add action-led prompts, numbered steps, state feedback, and meaningful motion while honoring reduced motion.
 
 # Risks
-Stale presence, accidental exposure of private rooms, host disconnects, responsive crowding, and regressions in room-code/reconnect flows.
+Excess motion/noise, duplicate audio, rerendered listeners, unclear card ownership, mobile crowding, and changing behavior while restyling.
 
 # Verification
-Add protocol tests for public-lobby filtering, run the full test suite, then exercise home, host, join, private room, desktop, mobile, and reduced-motion states in a browser.
+Run syntax and unit tests, then Playwright through splash, home, bot setup, offer selection, exchange, choose, rules, dialogs, lobby controls, desktop/mobile, keyboard focus, reduced motion, and console errors; inspect screenshots.
