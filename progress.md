@@ -89,3 +89,8 @@ Original prompt: Ok now let's work on the game UI. Add a how to play section. Ma
 - Added explicit lobby progress (room → rival → ready), offer progress (choose two → reveal one → send), state-specific card labels, action-led instructions, clearer disabled-button copy, and a concise next action in `render_game_to_text`.
 - Bumped the offline cache to v16. Twenty-five automated tests, JavaScript syntax, interaction-source audit, and diff hygiene pass.
 - Installed Playwright Chromium under a writable temporary cache, but macOS denied its Mach rendezvous service at launch. Automated screenshots remain blocked; manual responsive visual/audio QA is still required.
+
+## 2026-10-10 — Recruitment ownership clarity
+- Replaced the full-size flying-card overlay with a grounded resolution sheet that says who chose first, who receives the remaining card, which contacts they took, and each recipient-specific outcome.
+- Resolution is now player-controlled with “Show movement on board” plus a timed fallback. The board retains a Last exchange recap until the next reveal, showing “Agent took Contact,” movement, and exact before/after spaces.
+- Added tested resolution mapping for recipient, contact, delta, and wrapped board spaces; 26 automated tests, syntax, and diff hygiene pass. The attached recording could not be opened because macOS denied access to its temporary capture folder.

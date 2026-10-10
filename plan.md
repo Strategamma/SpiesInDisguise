@@ -1,14 +1,14 @@
 # Goal
-Make every interaction visually consistent, responsive, audible, and self-explanatory so a first-time player can complete a match without guessing.
+Make recruitment resolution unmistakable: which card each player received, what it did, and where each agent moved.
 
 # Scope
-Audit home, setup, lobby, offer, choose, exchange, waiting, handoff, rules, dialogs, results, navigation, cards, and public-network controls. Preserve game rules and networking.
+Replace the flying full-card reveal treatment and redesign the persistent post-choice recap. Preserve authoritative timing, hidden-card privacy before choice, rules, and networking.
 
 # Approach
-Define one button system with clear primary/secondary/quiet/danger/selected states; route interaction sounds through shared delegation; add action-led prompts, numbered steps, state feedback, and meaningful motion while honoring reduced motion.
+Use a grounded resolution sheet with explicit “chose” and “receives” labels, compact contact identities, and recipient-specific effects. Persist a “Last exchange” recap beside the chase board with before/after spaces.
 
 # Risks
-Excess motion/noise, duplicate audio, rerendered listeners, unclear card ownership, mobile crowding, and changing behavior while restyling.
+Showing effects for the wrong recipient, revealing concealed data early, stale recaps, mobile crowding, and result timing drift.
 
 # Verification
-Run syntax and unit tests, then Playwright through splash, home, bot setup, offer selection, exchange, choose, rules, dialogs, lobby controls, desktop/mobile, keyboard focus, reduced motion, and console errors; inspect screenshots.
+Test recipient mapping and movement deltas, run the full suite and syntax checks, inspect the supplied recording where permitted, and verify reduced-motion behavior.

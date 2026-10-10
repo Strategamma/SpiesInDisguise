@@ -27,6 +27,7 @@
 - Reveal timing should feel deliberate without delaying play; reduced-motion users receive an abbreviated, non-spatial transition.
 - After the reveal completes, the board briefly pairs each recruited contact with its recipient and signed movement; both moved pieces pulse. This feedback must derive from the authoritative before/after state.
 - Public network chips always show contact and count. Hover gives a concise preview; tap/click opens the full movement curve and highlights the next recruit effect. Never expose hand or concealed-offer data here.
+- Recruitment resolution stays grounded in a compact sheet; cards never fly above the table. It explicitly labels who chose first, who received the remaining card, each contact, and its recipient-specific effect. The player advances to the board, where a persistent Last exchange recap repeats ownership and before/after spaces until the next resolution.
 
 # Interface density
 - Mode cards are compact decision rows on every viewport: icon, title/context, then a clearly aligned affordance. Recommendations must never compete with the title.

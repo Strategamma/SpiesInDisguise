@@ -48,3 +48,11 @@ export function recruitMovementNotice(previous, next, reveal) {
     { playerIndex: 1 - chooser, kind: reveal.other.kind, delta: next.players[1 - chooser].progress - previous.players[1 - chooser].progress }
   ];
 }
+
+export function resolutionMovementNotice(previous, next, reveal) {
+  return recruitMovementNotice(previous, next, reveal).map(item => ({
+    ...item,
+    fromSpace: boardPosition(item.playerIndex, previous.players[item.playerIndex].progress) + 1,
+    toSpace: boardPosition(item.playerIndex, next.players[item.playerIndex].progress) + 1
+  }));
+}

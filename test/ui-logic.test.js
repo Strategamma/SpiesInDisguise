@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { boardPosition, contactStageEffect, interceptionGap, nextRecruitIndex, projectedCardPosition, recruitMovementNotice, stateMotionCue } from "../public/ui-logic.js";
+import { boardPosition, contactStageEffect, interceptionGap, nextRecruitIndex, projectedCardPosition, recruitMovementNotice, resolutionMovementNotice, stateMotionCue } from "../public/ui-logic.js";
 
 test("card preview highlights the next applicable recruitment stage", () => {
   const players = [{ collection: {} }, { collection: { courier: 1, ghost: 2, oracle: 5 } }];
@@ -49,5 +49,14 @@ test("recruit feedback maps each revealed card to its recipient and movement", (
   assert.deepEqual(recruitMovementNotice(previous, next, { chooser: 0, chosen: { kind: "analyst" }, other: { kind: "handler" } }), [
     { playerIndex: 0, kind: "analyst", delta: 6 },
     { playerIndex: 1, kind: "handler", delta: -2 }
+  ]);
+});
+
+test("resolution recap keeps ownership, movement, and board spaces together", () => {
+  const previous = { players: [{ progress: 11 }, { progress: -1 }] };
+  const next = { players: [{ progress: 13 }, { progress: -4 }] };
+  assert.deepEqual(resolutionMovementNotice(previous, next, { chooser: 1, chosen: { kind: "sleeper" }, other: { kind: "courier" } }), [
+    { playerIndex: 1, kind: "sleeper", delta: -3, fromSpace: 6, toSpace: 3 },
+    { playerIndex: 0, kind: "courier", delta: 2, fromSpace: 12, toSpace: 2 }
   ]);
 });

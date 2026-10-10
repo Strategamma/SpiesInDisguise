@@ -1,5 +1,5 @@
 import { chooseBotCard, chooseBotOffer, createLocalGame, localChoose, localOffer, localSwap, localView } from "./local-game.js";
-import { BOARD_SPACES, boardPosition, contactStageEffect, interceptionGap, nextRecruitIndex, projectedCardPosition, recruitMovementNotice, stateMotionCue } from "./ui-logic.js";
+import { BOARD_SPACES, boardPosition, contactStageEffect, interceptionGap, nextRecruitIndex, projectedCardPosition, resolutionMovementNotice, stateMotionCue } from "./ui-logic.js";
 
 const CONTACTS = {
   courier: { name: "Courier", symbol: "◈", moves: [1, 2, 3], note: "Reliable progress with every recruit." },
@@ -66,7 +66,7 @@ let motionCue = null;
 let landscapePromptDismissed = false;
 const savedBotProfile = localStorage.getItem("spies-bot-profile");
 let botProfile = BOT_PROFILES[savedBotProfile] ? savedBotProfile : "balanced";
-const REVEAL_DURATION = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 350 : 1450;
+const REVEAL_DURATION = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 4500 : 6500;
 
 const SOUND_PATTERNS = {
   hover: [[560, .025, 0]],
@@ -127,6 +127,7 @@ function applyState(next) {
 
 function startReveal(payload, onComplete = null) {
   clearTimeout(revealTimer);
+  movementNotice = null;
   revealState = payload;
   pendingRevealState = null;
   revealComplete = onComplete;
@@ -149,9 +150,7 @@ function finishReveal() {
     const next = pendingRevealState;
     pendingRevealState = null;
     if (resolvedReveal && previous?.players && next.players) {
-      movementNotice = recruitMovementNotice(previous, next, resolvedReveal);
-      clearTimeout(movementTimer);
-      movementTimer = setTimeout(() => { movementNotice = null; render(); }, 2600);
+      movementNotice = resolutionMovementNotice(previous, next, resolvedReveal);
     }
     applyState(next);
   }
@@ -479,18 +478,20 @@ function cardHtml(card, options = {}) {
 }
 
 function revealCardHtml(card, wasHidden, recipient) {
-  const front = cardHtml(card, { static: true, playerIndex: recipient });
-  if (!wasHidden) return `<div class="transfer-card face-known">${front}</div>`;
-  return `<div class="flip-card"><div class="flip-card-inner"><div class="flip-card-face flip-card-back"><span>?</span><small>Concealed signal</small></div><div class="flip-card-face flip-card-front">${front}</div></div></div>`;
+  const contact = CONTACTS[card.kind];
+  const outcome = cardOutcomeText(card, recipient);
+  const front = `<div class="resolution-card contact-${card.kind}"><span>${contact.symbol}</span><div><b>${contact.name}</b><small>${outcome}</small></div></div>`;
+  if (!wasHidden) return `<div class="resolution-card-wrap face-known">${front}</div>`;
+  return `<div class="resolution-card-wrap was-hidden"><div class="resolution-card-flip"><div class="resolution-card-back"><span>?</span><small>Hidden contact</small></div><div class="resolution-card-front">${front}</div></div></div>`;
 }
 
 function revealOverlayHtml() {
   if (!revealState) return "";
   const chooser = revealState.chooser;
   const otherRecipient = 1 - chooser;
-  const chooserLabel = chooser === state.you ? "You recruited" : `${escapeHtml(state.players[chooser]?.name || "Rival")} recruited`;
-  const otherLabel = otherRecipient === state.you ? "You recruited" : `${escapeHtml(state.players[otherRecipient]?.name || "Rival")} recruited`;
-  return `<div class="reveal-overlay" role="status" aria-live="assertive"><div class="reveal-heading"><span class="eyebrow">Signals resolved</span><h2>${revealState.choice === "hidden" ? "Identity revealed" : "Choice confirmed"}</h2></div><div class="reveal-stage"><div class="reveal-lane chosen"><span>${chooserLabel}</span>${revealCardHtml(revealState.chosen, revealState.choice === "hidden", chooser)}</div><div class="reveal-divider"><i></i><b>Recruit</b><i></i></div><div class="reveal-lane other"><span>${otherLabel}</span>${revealCardHtml(revealState.other, revealState.choice === "open", otherRecipient)}</div></div></div>`;
+  const chooserName = chooser === state.you ? "You" : escapeHtml(state.players[chooser]?.name || "Rival");
+  const otherName = otherRecipient === state.you ? "You" : escapeHtml(state.players[otherRecipient]?.name || "Rival");
+  return `<div class="reveal-overlay" role="status" aria-live="assertive"><section class="reveal-sheet"><div class="reveal-heading"><span class="eyebrow">Exchange resolved</span><h2>Here’s who took what</h2><p>Both contacts resolve for their new owner.</p></div><div class="reveal-stage"><div class="reveal-lane chosen"><span><b>${chooserName} chose</b><small>First pick</small></span>${revealCardHtml(revealState.chosen, revealState.choice === "hidden", chooser)}</div><div class="reveal-divider" aria-hidden="true"><i></i><b>AND</b><i></i></div><div class="reveal-lane other"><span><b>${otherName} receives</b><small>Card left behind</small></span>${revealCardHtml(revealState.other, revealState.choice === "open", otherRecipient)}</div></div><button class="primary reveal-continue" id="continue-resolution">Show movement on board <span aria-hidden="true">→</span></button></section></div>`;
 }
 
 function playerBox(player, index) {
@@ -525,7 +526,7 @@ function trackHtml() {
   const danger = gap <= 2;
   const nodes = Array.from({ length: BOARD_SPACES }, (_, i) => { const point = position(-90 + i * (360 / BOARD_SPACES)); const home = i === 0 ? " start-a" : i === 6 ? " start-b" : ""; return `<i class="orbit-node route${home}" style="--x:${point.x}%;--y:${point.y}%"><small>${i + 1}</small>${home ? `<em>${i === 0 ? "A" : "B"}</em>` : ""}</i>`; }).join("");
   const moved = player => `${player.progress > 0 ? "+" : ""}${player.progress} moved`;
-  const movement = movementNotice ? `<div class="movement-notice" role="status" aria-live="polite">${movementNotice.map(({ playerIndex, kind, delta }) => { const index = Math.min(2, Math.max(0, Number(state.players[playerIndex].collection[kind] || 1) - 1)); const effect = contactStageEffect(kind, index, delta); const result = effect.className === "movement" ? `${delta > 0 ? "+" : ""}${delta} ${delta === 1 || delta === -1 ? "space" : "spaces"}` : effect.label; return `<span class="movement-chip contact-${kind}"><i>${effect.className === "movement" ? CONTACTS[kind].symbol : effect.icon}</i><b>${escapeHtml(state.players[playerIndex].name)}</b><small>${CONTACTS[kind].name} · ${result}</small></span>`; }).join("")}</div>` : "";
+  const movement = movementNotice ? `<section class="movement-notice" role="status" aria-live="polite"><div class="resolution-title"><span>Last exchange</span><b>Who took what</b></div>${movementNotice.map(({ playerIndex, kind, delta, fromSpace, toSpace }) => { const index = Math.min(2, Math.max(0, Number(state.players[playerIndex].collection[kind] || 1) - 1)); const effect = contactStageEffect(kind, index, delta); const result = effect.className === "movement" ? delta === 0 ? "Stayed in place" : `Moved ${delta > 0 ? "+" : ""}${delta} ${Math.abs(delta) === 1 ? "space" : "spaces"}` : effect.label; return `<article class="movement-chip contact-${kind}"><i>${effect.className === "movement" ? CONTACTS[kind].symbol : effect.icon}</i><div><b>${escapeHtml(state.players[playerIndex].name)} took ${CONTACTS[kind].name}</b><small>${result}</small></div><em><small>Board</small>${fromSpace} <span>→</span> ${toSpace}</em></article>`; }).join("")}</section>` : "";
   const movedPlayers = new Set(movementNotice?.map(item => item.playerIndex) || []);
   return `<div class="orbit-wrap ${danger ? "danger-zone" : ""}" role="img" aria-label="Twelve-space clockwise pursuit board. Agents are ${gap} relative spaces from interception."><div class="orbit-caption"><b>${danger ? "Danger zone" : "Clockwise chase"}</b><span>${danger ? `${gap} ${gap === 1 ? "space" : "spaces"} from interception` : "Gain 6 spaces on your rival"}</span></div><div class="orbit-board"><div class="orbit-ring"></div>${nodes}<div class="orbit-direction" aria-hidden="true">↻</div><div class="orbit-agent agent-a ${movedPlayers.has(0) ? "just-moved" : ""}" style="--x:${a.x}%;--y:${a.y}%"><span>A</span></div><div class="orbit-agent agent-b ${movedPlayers.has(1) ? "just-moved" : ""}" style="--x:${b.x}%;--y:${b.y}%"><span>B</span></div><div class="orbit-center"><strong>${gap}</strong><span>${danger ? "spaces left" : "spaces gained"}<br>to intercept</span></div></div>${movement}<div class="orbit-legend"><span><i class="agent-dot a"></i><b>${escapeHtml(state.players[0].name)}</b><small>Space ${positions[0] + 1} · ${moved(state.players[0])}</small></span><span><i class="agent-dot b"></i><b>${escapeHtml(state.players[1].name)}</b><small>Space ${positions[1] + 1} · ${moved(state.players[1])}</small></span></div></div>`;
 }
@@ -605,6 +606,7 @@ function renderGame() {
     app.innerHTML = shell(`<div class="match-layout ${state.winner !== null ? "is-result" : ""}">${matchStatus}<div class="board-panel">${board}</div><section class="play-column motion-${activeMotion || "steady"}" id="play-area"><div class="play-content">${playArea}</div></section>${networks}</div>`) + revealOverlayHtml();
   }
   bindCommon();
+  document.querySelector("#continue-resolution")?.addEventListener("click", finishReveal);
   document.querySelector("#ready-player")?.addEventListener("click", () => { localHandoff = false; render(); });
   document.querySelector("#copy")?.addEventListener("click", shareRoom);
   document.querySelector("#share")?.addEventListener("click", shareRoom);
