@@ -52,8 +52,17 @@ let localGame = null;
 let localHandoff = false;
 let installPrompt = null;
 let homePanel = pendingRoom ? "wifi" : null;
+let homeNavigation = "home";
 let botTimer = null;
-let splashVisible = true;
+let splashVisible = false;
+let networkMode = params.get("network") === "lan" ? "lan" : "internet";
+let actionPending = false;
+let connectionError = "";
+let reconnectTimer;
+let queuedOnlineAction = null;
+let lanAddresses = [];
+const localHost = /^(localhost$|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(location.hostname);
+if (localHost && !params.has("network")) networkMode = "lan";
 let soundEnabled = localStorage.getItem("spies-sound") !== "off";
 let audioContext = null;
 let revealState = null;
@@ -63,9 +72,9 @@ let revealComplete = null;
 let movementNotice = null;
 let movementTimer = null;
 let motionCue = null;
-let landscapePromptDismissed = false;
+let landscapePromptDismissed = true;
 const savedBotProfile = localStorage.getItem("spies-bot-profile");
-let botProfile = BOT_PROFILES[savedBotProfile] ? savedBotProfile : "balanced";
+let botProfile = BOT_PROFILES[savedBotProfile] ? savedBotProfile : "rookie";
 const REVEAL_DURATION = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 4500 : 6500;
 
 const SOUND_PATTERNS = {
@@ -159,6 +168,7 @@ function finishReveal() {
 }
 
 function gatewayUrl() {
+  if (networkMode === "lan") return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
   if (window.SPIES_IN_DISGUISE_GATEWAY || window.SHADOW_CIRCUIT_GATEWAY) return window.SPIES_IN_DISGUISE_GATEWAY || window.SHADOW_CIRCUIT_GATEWAY;
   return `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`;
 }
@@ -173,14 +183,25 @@ function showToast(message) {
 function send(type, payload = {}) {
   if (playMode && playMode !== "wifi") return localAction(type, payload);
   if (socket?.readyState !== WebSocket.OPEN) return showToast("Still connecting…");
+  if (actionPending) return;
+  actionPending = true;
+  document.querySelectorAll("#create,#create-public,#join,#offer,#start-match,#toggle-ready,#again,[data-choice]").forEach(button => { button.disabled = true; });
   socket.send(JSON.stringify({ type, ...payload }));
 }
 
 function connect() {
-  socket = new WebSocket(gatewayUrl());
-  socket.addEventListener("open", () => { connected = true; render(); resume(); });
-  socket.addEventListener("close", () => { connected = false; render(); setTimeout(connect, 1800); });
+  const currentSocket = socket = new WebSocket(gatewayUrl());
+  socket.addEventListener("open", () => { if (socket !== currentSocket) return; connected = true; connectionError = ""; actionPending = false; render(); if (queuedOnlineAction) { const queued = queuedOnlineAction; queuedOnlineAction = null; beginOnlineRoom(queued.isPublic, queued.room); } else resume(); });
+  socket.addEventListener("close", event => { if (socket !== currentSocket) return; connected = false; actionPending = false;
+    if (event.code === 4001) {
+      clearTimeout(revealTimer); clearTimeout(movementTimer); revealTimer = null; movementTimer = null;
+      revealState = null; pendingRevealState = null; revealComplete = null; movementNotice = null;
+      state = null; connectionError = "This room is open on another device. Continue there, or reconnect here.";
+    }
+    render(); if (event.code !== 4001) reconnectTimer = setTimeout(connect, 1800);
+  });
   socket.addEventListener("message", event => {
+    if (socket !== currentSocket) return;
     const message = JSON.parse(event.data);
     if (message.type === "presence") {
       liveDuels = Array.isArray(message.duels) ? message.duels : [];
@@ -188,28 +209,29 @@ function connect() {
       if (board && !state) { board.outerHTML = liveDuelBoardHtml(); bindDuelBoard(); bindInteractionFeedback(); }
     } else if (message.type === "reveal") startReveal(message);
     else if (message.type === "state") {
+      actionPending = false; connectionError = ""; pendingRoom = message.state.room;
       playMode = "wifi";
       if (revealState) queueAfterReveal(message.state); else applyState(message.state);
       selected = [];
       faceUpId = null;
       swapMode = false;
-      localStorage.setItem(`spies-token-${state.room}`, message.token);
-      history.replaceState({}, "", `${location.pathname}?room=${state.room}`);
+      localStorage.setItem(`spies-token-${networkMode}-${state.room}`, message.token);
+      history.replaceState({}, "", `${location.pathname}?room=${state.room}&network=${networkMode}`);
       render();
-    } else if (message.type === "error") showToast(message.message);
-    else if (message.type === "room_closed") { clearTimeout(revealTimer); clearTimeout(movementTimer); revealState = null; pendingRevealState = null; revealComplete = null; movementNotice = null; state = null; renderHome("That room expired."); }
+    } else if (message.type === "error") { actionPending = false; connectionError = message.message; if (!state) pendingRoom = ""; render(); showToast(message.message); }
+    else if (message.type === "room_closed") { clearTimeout(revealTimer); clearTimeout(movementTimer); revealState = null; pendingRevealState = null; revealComplete = null; movementNotice = null; state = null; pendingRoom = ""; connectionError = message.message || "That room expired. Create a new room."; history.replaceState({}, "", location.pathname); renderHome(); }
   });
 }
 
 function resume() {
   if (!pendingRoom || playMode !== "wifi") return;
-  const token = localStorage.getItem(`spies-token-${pendingRoom}`) || localStorage.getItem(`shadow-token-${pendingRoom}`);
-  if (token) send("join", { room: pendingRoom, token, name: savedName || "Agent", protocol: 3 });
+  const token = localStorage.getItem(`spies-token-${networkMode}-${pendingRoom}`) || (networkMode === "internet" ? localStorage.getItem(`spies-token-${pendingRoom}`) || localStorage.getItem(`shadow-token-${pendingRoom}`) : null);
+  send("join", { room: pendingRoom, token: token || undefined, name: localStorage.getItem("spies-name") || savedName || "Guest agent", protocol: 3 });
 }
 
 function shell(content) {
   const inGame = Boolean(state);
-  return `<div class="app-shell"><header class="topbar"><button class="brand brand-button" data-home aria-label="Return to home"><img class="brand-logo" src="./logo.svg" alt="Spies in Disguise"></button><div class="header-actions">${!state && !isInstalled() ? `<button class="install-button" data-install aria-label="Install Spies in Disguise"><span aria-hidden="true">⇩</span><b>Install</b></button>` : ""}<button class="sound-button" data-sound aria-label="${soundEnabled ? "Mute sounds" : "Turn sounds on"}" aria-pressed="${soundEnabled}"><span aria-hidden="true">${soundEnabled ? "♪" : "×"}</span></button></div></header><div class="app-content">${content}</div><nav class="app-nav" aria-label="Primary navigation"><button class="nav-button ${inGame ? "" : "active"}" data-home ${inGame ? "" : 'aria-current="page"'}><span aria-hidden="true">⌂</span><b>Home</b></button><button class="nav-button ${inGame ? "active" : ""}" data-play ${inGame ? 'aria-current="page"' : ""}><span aria-hidden="true">◉</span><b>Play</b></button><button class="nav-button" data-rules><span aria-hidden="true">?</span><b>Rules</b></button></nav></div>${inGame && !landscapePromptDismissed ? `<div class="rotate-device" role="status"><span aria-hidden="true">↻</span><b>Rotate to landscape</b><small>The board is designed for a wider view.</small><button class="text-btn" data-dismiss-rotate>Continue in portrait</button></div>` : ""}${rulesDialog()}${contactDetailDialog()}${installDialog()}${leaveDialog()}`;
+  return `<div class="app-shell"><header class="topbar"><button class="brand brand-button" data-home aria-label="Return to home"><img class="brand-logo" src="./logo.svg" alt="Spies in Disguise"></button><div class="header-actions">${!state && !isInstalled() ? `<button class="install-button" data-install aria-label="Install Spies in Disguise"><span aria-hidden="true">⇩</span><b>Install</b></button>` : ""}<button class="sound-button" data-sound aria-label="${soundEnabled ? "Mute sounds" : "Turn sounds on"}" aria-pressed="${soundEnabled}"><span aria-hidden="true">${soundEnabled ? "♪" : "×"}</span></button></div></header><nav class="app-nav" aria-label="Primary navigation"><button class="nav-button ${inGame ? "" : "active"}" data-home ${inGame ? "" : 'aria-current="page"'}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 10 8-7 8 7v10h-6v-6h-4v6H4z"/></svg><b>Home</b></button><button class="nav-button ${inGame ? "active" : ""}" data-play ${inGame ? 'aria-current="page"' : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="5" width="12" height="16" rx="2"/><path d="M5 17H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2"/></svg><b>Play</b></button><button class="nav-button" data-rules><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 8.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4M12 16h.01"/></svg><b>Rules</b></button></nav><div class="app-content">${content}</div></div>${inGame && !landscapePromptDismissed ? `<div class="rotate-device" role="status"><span aria-hidden="true">↻</span><b>Rotate to landscape</b><small>The board is designed for a wider view.</small><button class="text-btn" data-dismiss-rotate>Continue in portrait</button></div>` : ""}${rulesDialog()}${contactDetailDialog()}${installDialog()}${leaveDialog()}`;
 }
 
 function renderSplash() {
@@ -276,28 +298,31 @@ function isInstalled() { return matchMedia("(display-mode: standalone)").matches
 
 function preferLandscape() {
   if (!matchMedia("(pointer: coarse) and (max-width: 899px)").matches) return;
-  screen.orientation?.lock?.("landscape").catch(() => {});
+  // Both orientations remain playable; no forced rotation.
 }
 
 function bindCommon() {
   const rules = document.querySelector("#rules");
   const syncNavigation = () => {
-    document.querySelectorAll(".nav-button").forEach(button => button.removeAttribute("aria-current"));
-    document.querySelector(rules?.open ? ".nav-button[data-rules]" : state ? ".nav-button[data-play]" : ".nav-button[data-home]")?.setAttribute("aria-current", "page");
+    document.querySelectorAll(".nav-button").forEach(button => { button.removeAttribute("aria-current"); button.classList.remove("active"); });
+    const active = document.querySelector(rules?.open ? ".nav-button[data-rules]" : state || homeNavigation === "play" ? ".nav-button[data-play]" : ".nav-button[data-home]");
+    active?.setAttribute("aria-current", "page"); active?.classList.add("active");
   };
   document.querySelectorAll("[data-rules]").forEach(button => button.addEventListener("click", () => { rules.showModal(); syncNavigation(); }));
   document.querySelectorAll("[data-close-rules]").forEach(button => button.addEventListener("click", () => rules.close()));
   rules?.addEventListener("close", syncNavigation);
   document.querySelector("[data-install]")?.addEventListener("click", installApp);
+  document.querySelector("[data-reconnect]")?.addEventListener("click", () => { clearTimeout(reconnectTimer); connect(); });
   document.querySelector("[data-sound]")?.addEventListener("click", toggleSound);
   document.querySelector("[data-close-install]")?.addEventListener("click", () => document.querySelector("#install-dialog").close());
-  document.querySelectorAll("[data-home]").forEach(button => button.addEventListener("click", requestHome));
-  document.querySelector("[data-play]")?.addEventListener("click", () => document.querySelector(state ? "#play-area" : "#play-modes")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  document.querySelectorAll("[data-home]").forEach(button => button.addEventListener("click", () => { homeNavigation = "home"; requestHome(); syncNavigation(); }));
+  document.querySelector("[data-play]")?.addEventListener("click", () => { if (!state) homeNavigation = "play"; document.querySelector(state ? "#play-area" : "#play-modes")?.scrollIntoView({ behavior: "smooth", block: "start" }); syncNavigation(); });
   document.querySelector("[data-stay]")?.addEventListener("click", () => document.querySelector("#leave-dialog").close());
   document.querySelector("[data-confirm-home]")?.addEventListener("click", returnHome);
   document.querySelector("[data-dismiss-rotate]")?.addEventListener("click", () => { landscapePromptDismissed = true; document.querySelector(".rotate-device")?.remove(); });
   document.querySelectorAll("[data-contact-kind]").forEach(button => button.addEventListener("click", () => openContactDetail(button)));
   document.querySelectorAll("[data-close-contact]").forEach(button => button.addEventListener("click", () => document.querySelector("#contact-detail")?.close()));
+  syncNavigation();
   bindInteractionFeedback();
 }
 
@@ -341,7 +366,7 @@ async function installApp() {
 }
 
 function returnHome() {
-  clearTimeout(botTimer);
+  clearTimeout(botTimer); queuedOnlineAction = null; actionPending = false; connectionError = "";
   clearTimeout(revealTimer); clearTimeout(movementTimer); revealTimer = null; movementTimer = null; revealState = null; pendingRevealState = null; revealComplete = null; movementNotice = null;
   if (playMode === "wifi" && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: "leave" }));
   playMode = null; localGame = null; state = null; localHandoff = false; pendingRoom = ""; homePanel = null;
@@ -352,15 +377,15 @@ function returnHome() {
 
 function liveDuelBoardHtml() {
   const rows = liveDuels.length
-    ? liveDuels.map(duel => `<button class="duel-agent" data-duel-room="${escapeHtml(duel.room)}"><span class="duel-avatar" aria-hidden="true">${escapeHtml(duel.host.slice(0, 1).toUpperCase())}</span><span><b>${escapeHtml(duel.host)}</b><small>Ready to duel · LAN / online</small></span><em>Challenge <i aria-hidden="true">→</i></em></button>`).join("")
+    ? liveDuels.map(duel => `<button class="duel-agent" data-duel-room="${escapeHtml(duel.room)}"><span class="duel-avatar" aria-hidden="true">${escapeHtml(duel.host.slice(0, 1).toUpperCase())}</span><span><b>${escapeHtml(duel.host)}</b><small>${networkMode === "lan" ? "Ready on this Wi-Fi" : "Ready online"}</small></span><em>Challenge <i aria-hidden="true">→</i></em></button>`).join("")
     : `<div class="duel-empty"><span aria-hidden="true">⌁</span><div><b>No open signals yet</b><small>Host the first duel and your codename will appear here.</small></div></div>`;
-  return `<section class="live-duels" id="live-duel-board" aria-labelledby="live-duels-title"><div class="live-duels-head"><div><span class="live-label"><i></i>${connected ? "Network live" : "Connecting"}</span><h2 id="live-duels-title">Agents ready to duel</h2></div><button class="host-duel" data-host-duel ${connected ? "" : "disabled"}>Host open duel <span aria-hidden="true">＋</span></button></div><div class="duel-list">${rows}</div><div class="duel-foot"><span>Same room or across the web</span><button class="text-btn" data-mode="wifi">Use a private code →</button></div></section>`;
+  return `<section class="live-duels" id="live-duel-board" aria-labelledby="live-duels-title"><div class="live-duels-head"><div><span class="live-label"><i></i>${connected ? "Network live" : "Connecting"}</span><h2 id="live-duels-title">Agents ready to duel</h2></div><button class="host-duel" data-host-duel ${connected ? "" : "disabled"}>Host open duel <span aria-hidden="true">＋</span></button></div><div class="duel-list">${rows}</div><div class="duel-foot"><span>${networkMode === "lan" ? "Local server only" : "Internet connection required"}</span><button class="text-btn" data-private-code>Use a private code →</button></div></section>`;
 }
 
 function beginOnlineRoom(isPublic, room = "") {
-  const name = (document.querySelector("#name")?.value || localStorage.getItem("spies-name") || "").trim();
-  if (!name) { pendingRoom = room; homePanel = "wifi"; renderHome(); setTimeout(() => document.querySelector("#name")?.focus(), 0); return; }
-  localStorage.setItem("spies-name", name); landscapePromptDismissed = false; preferLandscape(); playMode = "wifi";
+  if (!connected) { queuedOnlineAction = { isPublic, room }; showToast("Connecting… your room will open shortly"); return; }
+  const name = (document.querySelector("#name")?.value || localStorage.getItem("spies-name") || "Guest agent").trim() || "Guest agent";
+  localStorage.setItem("spies-name", name); landscapePromptDismissed = true; playMode = "wifi";
   if (room) { pendingRoom = room; send("join", { room, name, protocol: 3 }); }
   else send("create", { name, protocol: 3, public: isPublic });
 }
@@ -368,18 +393,27 @@ function beginOnlineRoom(isPublic, room = "") {
 function bindDuelBoard() {
   document.querySelectorAll("[data-host-duel]").forEach(button => button.addEventListener("click", () => beginOnlineRoom(true)));
   document.querySelectorAll("[data-duel-room]").forEach(button => button.addEventListener("click", () => beginOnlineRoom(false, button.dataset.duelRoom)));
-  document.querySelector("#live-duel-board [data-mode='wifi']")?.addEventListener("click", () => { homePanel = "wifi"; renderHome(); setTimeout(() => document.querySelector("#wifi-setup")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0); });
+  document.querySelectorAll("[data-private-code]").forEach(button => button.addEventListener("click", () => { homePanel = "wifi"; renderHome(); setTimeout(() => document.querySelector("#wifi-setup")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0); }));
 }
 
 function renderHome(error = "") {
   state = null;
-  const currentName = localStorage.getItem("spies-name") || savedName;
-  app.innerHTML = shell(`<section class="home"><div class="home-hero"><div class="home-intro"><span class="eyebrow">Secure channel / Live network</span><h1><span class="outline">Hide your agent.</span><br><span class="accent">Read their move.</span></h1><p class="lede">One room. Two rivals. Offer a contact in plain sight, hide another, and turn every bluff into movement.</p><div class="hero-actions"><button class="hero-primary" data-host-duel>Find a live duel <span aria-hidden="true">→</span></button><button class="briefing-link" data-rules><span class="briefing-play" aria-hidden="true">?</span><span><b>New agent?</b><small>Learn it in 60 seconds</small></span></button></div></div><div class="hero-card" aria-hidden="true"><span class="hero-card-signal"></span><img src="./icon.svg" alt=""><b>CLASSIFIED</b><small>One face up<br>One face down</small></div></div>${liveDuelBoardHtml()}<div class="mode-heading" id="play-modes"><div><span class="eyebrow">Play your way</span><h2>More game modes</h2></div><span>About 10 minutes</span></div><div class="mode-grid"><button class="mode-card recommended" data-mode="bot"><span class="mode-icon" aria-hidden="true">⌁</span><span class="mode-copy"><span class="mode-badge">Best first game</span><b>Play vs Bot</b><small>Solo practice · works offline</small></span><span class="mode-arrow" aria-hidden="true">›</span></button><button class="mode-card" data-mode="local"><span class="mode-icon" aria-hidden="true">◇</span><span class="mode-copy"><b>Pass & Play</b><small>Two agents · one shared device</small></span><span class="mode-arrow" aria-hidden="true">›</span></button><button class="mode-card wifi-mode-card" data-mode="wifi"><span class="mode-icon" aria-hidden="true">◉</span><span class="mode-copy"><b>Private Room</b><small>Two devices · share a code</small></span><span class="mode-arrow" aria-hidden="true">›</span></button></div><div class="home-setup ${homePanel === "wifi" ? "show" : ""}" id="wifi-setup"><div class="setup-heading"><div><span class="eyebrow">Local network / online</span><h2>Connect two devices</h2></div><button class="text-btn" id="close-setup">Close</button></div><div class="field"><label for="name">Your codename</label><input id="name" maxlength="18" autocomplete="nickname" placeholder="Nightjar" value="${escapeHtml(currentName)}"></div><div class="wifi-actions"><div class="online-create-actions"><button class="primary" id="create-public" ${connected ? "" : "disabled"}>Host open duel</button><button class="secondary" id="create" ${connected ? "" : "disabled"}>Create private room</button></div><div class="wifi-divider"><span>or enter a room code</span></div><div class="join-row"><input id="room" aria-label="Room code" maxlength="6" inputmode="text" placeholder="K7M2QX" value="${escapeHtml(pendingRoom)}"><button class="secondary" id="join" ${connected ? "" : "disabled"}>Join</button></div></div>${error ? `<div class="error">${escapeHtml(error)}</div>` : ""}<div class="status-pill"><span class="dot ${connected ? "live" : ""}"></span>${connected ? "Duel network ready" : "Connecting to duel network…"}</div></div><section class="how-preview" aria-labelledby="how-title"><div class="section-heading"><div><span class="eyebrow">The mission</span><h2 id="how-title">How to play</h2></div><button class="text-btn" data-rules>View all rules <span aria-hidden="true">→</span></button></div><div class="preview-steps"><article><span>01</span><div><b>Offer two</b><p>Reveal one contact. Keep one secret.</p></div></article><article><span>02</span><div><b>Choose one</b><p>Your rival takes a card; you recruit the other.</p></div></article><article><span>03</span><div><b>Intercept</b><p>Gain six spaces on your rival or recruit 3 Oracles.</p></div></article></div></section><footer class="home-footer"><span>Spies in Disguise</span><span>Private play · live rivals</span></footer></section>`);
+  const currentName = document.querySelector("#name")?.value ?? (localStorage.getItem("spies-name") || savedName);
+  const currentRoom = document.querySelector("#room")?.value ?? pendingRoom;
+  app.innerHTML = shell(`<section class="home"><div class="home-hero"><div class="home-intro"><span class="eyebrow">Secure channel / Live network</span><h1><span class="outline">Hide your agent.</span><br><span class="accent">Read their move.</span></h1><p class="lede">One room. Two rivals. Offer a contact in plain sight, hide another, and turn every bluff into movement.</p><div class="hero-actions"><button class="hero-primary" data-mode="wifi">Play with a friend <span aria-hidden="true">→</span></button><button class="briefing-link" data-rules><span class="briefing-play" aria-hidden="true">?</span><span><b>New agent?</b><small>Learn it in 60 seconds</small></span></button></div></div><div class="hero-card" aria-hidden="true"><span class="hero-card-signal"></span><img src="./icon.svg" alt=""><b>CLASSIFIED</b><small>One face up<br>One face down</small></div></div>${liveDuelBoardHtml()}<div class="mode-heading" id="play-modes"><div><span class="eyebrow">Play your way</span><h2>Choose how to play</h2></div><span>About 10 minutes</span></div><div class="mode-grid"><button class="mode-card recommended" data-mode="bot"><span class="mode-icon" aria-hidden="true">⌁</span><span class="mode-copy"><span class="mode-badge">Best first game</span><b>Play vs Bot</b><small>Solo practice · works offline</small></span><span class="mode-arrow" aria-hidden="true">›</span></button><button class="mode-card" data-mode="local"><span class="mode-icon" aria-hidden="true">◇</span><span class="mode-copy"><b>Pass & Play</b><small>Two agents · one shared device</small></span><span class="mode-arrow" aria-hidden="true">›</span></button><button class="mode-card wifi-mode-card" data-mode="wifi"><span class="mode-icon" aria-hidden="true">◉</span><span class="mode-copy"><b>Play over Internet</b><small>Two devices · invite a friend</small></span><span class="mode-arrow" aria-hidden="true">›</span></button></div><div class="home-setup ${homePanel === "wifi" ? "show" : ""}" id="wifi-setup"><div class="setup-heading"><div><span class="eyebrow">${networkMode === "lan" ? "Same Wi-Fi" : "Internet"}</span><h2>${pendingRoom ? "Join your friend" : "Connect two devices"}</h2></div><button class="text-btn" id="close-setup">Close</button></div><div class="field"><label for="name">Your codename</label><input id="name" maxlength="18" autocomplete="nickname" placeholder="Guest agent (optional name)" value="${escapeHtml(currentName)}"></div><div class="wifi-actions"><div class="online-create-actions"><button class="primary" id="create-public" ${connected ? "" : "disabled"}>Host open duel</button><button class="secondary" id="create" ${connected ? "" : "disabled"}>Create private room</button></div><div class="wifi-divider"><span>or enter a room code</span></div><div class="join-row"><input id="room" aria-label="Room code" maxlength="6" inputmode="text" placeholder="K7M2QX" value="${escapeHtml(currentRoom)}"><button class="secondary" id="join" ${connected ? "" : "disabled"}>Join</button></div></div><div class="status-pill"><span class="dot ${connected ? "live" : ""}"></span>${connected ? "Duel network ready" : "Connecting to duel network…"}</div></div><section class="how-preview" aria-labelledby="how-title"><div class="section-heading"><div><span class="eyebrow">The mission</span><h2 id="how-title">How to play</h2></div><button class="text-btn" data-rules>View all rules <span aria-hidden="true">→</span></button></div><div class="preview-steps"><article><span>01</span><div><b>Offer two</b><p>Reveal one contact. Keep one secret.</p></div></article><article><span>02</span><div><b>Choose one</b><p>Your rival takes a card; you recruit the other.</p></div></article><article><span>03</span><div><b>Intercept</b><p>Gain six spaces on your rival or recruit 3 Oracles.</p></div></article></div></section><footer class="home-footer"><a href="https://decadenceinc.com">← More Decadence games</a><span>Private play · live rivals</span></footer></section>`);
   document.querySelector(".mode-grid")?.insertAdjacentHTML("afterend", `<div class="home-setup ${homePanel === "bot" ? "show" : ""}" id="bot-setup"><div class="setup-heading"><div><span class="eyebrow">Solo circuit</span><h2>Choose your rival</h2></div><button class="text-btn" data-close-setup>Close</button></div><p class="setup-copy">Start with Rook to learn, then move up when you can read the bluff.</p><div class="bot-profiles">${Object.entries(BOT_PROFILES).map(([key, profile]) => `<button class="bot-profile ${botProfile === key ? "selected" : ""}" data-bot-profile="${key}" aria-pressed="${botProfile === key}"><span>${key === "rookie" ? "Ⅰ" : key === "balanced" ? "Ⅱ" : "Ⅲ"}</span><b>${profile.name}<small>${profile.label}</small></b><em>${profile.note}</em></button>`).join("")}</div><button class="primary" id="start-bot">Play ${BOT_PROFILES[botProfile].name}</button></div>`);
+  if (error || connectionError) document.querySelector(".home")?.insertAdjacentHTML("afterbegin", `<div class="connection-notice" role="alert">${escapeHtml(error || connectionError)} Choose a mode below to play again.${!connected ? `<button class="secondary" data-reconnect>Reconnect here</button>` : ""}</div>`);
+  document.querySelector(".mode-grid")?.insertAdjacentHTML("beforeend", `<button class="mode-card" data-mode="lan"><span class="mode-icon" aria-hidden="true">⌂</span><span class="mode-copy"><b>Same Wi-Fi</b><small>Two devices · local host required</small></span><span class="mode-arrow" aria-hidden="true">›</span></button>`);
+  if (homePanel === "lan") document.querySelector("#wifi-setup")?.insertAdjacentHTML("beforebegin", `<section class="home-setup show"><span class="eyebrow">Same Wi-Fi</span><h2>Play on your local network</h2><p>Both devices must open the game from the same computer running its local server. Keep that computer awake and allow access on your Wi-Fi. Room codes work only on that server.</p>${localHost ? `<p>Share a local address with your friend, then create a room.</p>${lanAddresses.map(url => `<a class="lan-address" href="${escapeHtml(url)}">${escapeHtml(url)}</a>`).join("")}<button class="primary" id="use-lan">Create local room</button><button class="secondary" id="join-lan">Join by code</button>` : `<p>Ask your host for the local game address. This website cannot discover computers on your Wi-Fi.</p><button class="primary" id="use-internet">Use Internet instead</button>`}</section>`);
+  document.querySelector("#use-lan")?.addEventListener("click", () => { switchNetwork("lan"); beginOnlineRoom(false); });
+  document.querySelector("#join-lan")?.addEventListener("click", () => { switchNetwork("lan"); homePanel = "wifi"; renderHome(); });
+  document.querySelector("#use-internet")?.addEventListener("click", () => { switchNetwork("internet"); homePanel = "wifi"; renderHome(); });
   bindCommon();
   bindDuelBoard();
-  const remember = () => { const name = document.querySelector("#name")?.value.trim(); if (name) localStorage.setItem("spies-name", name); return name; };
+  const remember = () => { const name = document.querySelector("#name")?.value.trim() || "Guest agent"; if (name) localStorage.setItem("spies-name", name); return name; };
   document.querySelectorAll("[data-mode]").forEach(button => button.addEventListener("click", () => {
+    if (button.dataset.mode === "lan") { homePanel = "lan"; renderHome(); return; }
+    if (button.dataset.mode === "wifi") switchNetwork("internet");
     if (button.dataset.mode === "wifi" || button.dataset.mode === "bot") { homePanel = button.dataset.mode; renderHome(); setTimeout(() => document.querySelector(`#${homePanel}-setup`)?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0); }
     else startLocal(button.dataset.mode);
   }));
@@ -391,11 +425,19 @@ function renderHome(error = "") {
   document.querySelector("#join")?.addEventListener("click", () => { if (!remember()) return showToast("Choose a codename first"); const room = document.querySelector("#room").value.trim().toUpperCase(); if (room.length !== 6) return showToast("Enter the six-character code"); beginOnlineRoom(false, room); });
 }
 
+function switchNetwork(mode) {
+  if (networkMode === mode) return;
+  queuedOnlineAction = null;
+  networkMode = mode; connected = false; actionPending = false; pendingRoom = ""; liveDuels = [];
+  clearTimeout(reconnectTimer); const previous = socket; socket = null; previous?.close(); connect();
+}
+
 function escapeHtml(value = "") { return String(value).replace(/[&<>'"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[c])); }
 
 function startLocal(mode) {
+  queuedOnlineAction = null;
   clearTimeout(botTimer);
-  landscapePromptDismissed = false;
+  landscapePromptDismissed = true;
   preferLandscape();
   selected = []; faceUpId = null; swapMode = false;
   playMode = mode;
@@ -496,7 +538,7 @@ function revealOverlayHtml() {
 
 function playerBox(player, index) {
   const movement = `${player.progress > 0 ? "+" : ""}${player.progress}`;
-  const meta = state.phase === "lobby" ? `${player.connected ? "Connected" : "Reconnecting"} · ${player.ready ? "Ready" : "Not ready"}` : `${player.connected ? "online" : "reconnecting"} · ${movement} movement`;
+  const meta = state.phase === "lobby" ? `${player.connected ? "Connected" : "Reconnecting"} · ${player.ready ? "Ready" : "Not ready"}` : `${playMode === "wifi" ? player.connected ? "online" : "reconnecting" : "offline play"} · ${movement} movement`;
   return `<div class="player ${index === state.you ? "you" : ""} ${player.ready ? "ready" : ""}"><div class="player-name">${escapeHtml(player.name)}${index === state.you ? " · you" : ""}</div><div class="player-meta">${meta}</div></div>`;
 }
 
@@ -505,12 +547,12 @@ function lobbyHtml(activeMotion = null) {
   const canStart = state.isHost && state.players.length === 2 && state.players.every(player => player.connected && player.ready);
   const slots = [0, 1].map(index => {
     const player = state.players[index];
-    return player ? `<article class="lobby-agent ${player.ready ? "ready" : ""}"><span class="lobby-avatar">${index === 0 ? "A" : "B"}</span><div><b>${escapeHtml(player.name)}${index === 0 ? " · Host" : ""}</b><small>${player.connected ? player.ready ? "Ready for briefing" : "Choosing loadout" : "Reconnecting…"}</small></div><span class="ready-light"></span></article>` : `<article class="lobby-agent empty"><span class="lobby-avatar">?</span><div><b>Open agent slot</b><small>Share the room code to invite a rival</small></div><span class="ready-light"></span></article>`;
+    return player ? `<article class="lobby-agent ${player.ready ? "ready" : ""}"><span class="lobby-avatar">${index === 0 ? "A" : "B"}</span><div><b>${escapeHtml(player.name)}${index === 0 ? " · Host" : ""}</b><small>${player.connected ? player.ready ? "Ready for briefing" : "Not ready yet" : "Reconnecting…"}</small></div><span class="ready-light"></span></article>` : `<article class="lobby-agent empty"><span class="lobby-avatar">?</span><div><b>Open agent slot</b><small>Share the room code to invite a rival</small></div><span class="ready-light"></span></article>`;
   }).join("");
   const hostAction = state.isHost ? `<button class="primary launch-button" id="start-match" ${canStart ? "" : "disabled"}>${state.players.length < 2 ? "Waiting for rival" : canStart ? "Launch mission" : "Waiting for both agents"}</button>` : `<div class="lobby-wait"><span class="signal-mini"></span>${state.players.length < 2 ? "Waiting for another agent" : "The host will launch when both agents are ready"}</div>`;
   const joined = state.players.length === 2;
   const bothReady = joined && state.players.every(player => player.ready);
-  return `<section class="lobby-panel ${activeMotion === "ready" ? "ready-change" : ""}"><div class="lobby-heading"><span class="eyebrow">Secure lobby</span><h2>Get both agents ready</h2><p>Share the code, mark yourself ready, then the host launches the mission.</p></div><ol class="lobby-steps" aria-label="Lobby progress"><li class="done"><b>1</b><span>Room created</span></li><li class="${joined ? "done" : "current"}"><b>2</b><span>${joined ? "Rival joined" : "Invite rival"}</span></li><li class="${bothReady ? "done" : joined ? "current" : ""}"><b>3</b><span>${bothReady ? "Both ready" : "Ready up"}</span></li></ol><div class="lobby-code"><span>Room code</span><strong>${state.room}</strong><button class="icon-btn" id="share" aria-label="Share room invitation" title="Copy or share invitation">⧉</button></div><div class="lobby-agents">${slots}</div><button class="ready-button ${me.ready ? "is-ready" : ""}" id="toggle-ready" aria-pressed="${me.ready}"><span>${me.ready ? "✓" : "○"}</span><b>${me.ready ? "You are ready" : "Mark me ready"}</b><small>${me.ready ? "Tap to cancel" : "Required before launch"}</small></button>${hostAction}</section>`;
+  return `<section class="lobby-panel ${activeMotion === "ready" ? "ready-change" : ""}"><div class="lobby-heading"><span class="eyebrow">Secure lobby</span><h2>Get both agents ready</h2><p>Invite your friend, mark yourself ready, then the host starts.</p></div><ol class="lobby-steps" aria-label="Lobby progress"><li class="done"><b>1</b><span>Room created</span></li><li class="${joined ? "done" : "current"}"><b>2</b><span>${joined ? "Rival joined" : "Invite rival"}</span></li><li class="${bothReady ? "done" : joined ? "current" : ""}"><b>3</b><span>${bothReady ? "Both ready" : "Ready up"}</span></li></ol><div class="lobby-code"><span>Room code</span><strong>${state.room}</strong><button class="icon-btn" id="share" aria-label="Share room invitation" title="Copy or share invitation">⧉</button></div><button class="${joined ? "secondary" : "primary"}" id="invite-friend">Invite friend</button><input class="invitation-link" aria-label="Invitation link — select to copy" readonly value="${escapeHtml(invitationUrl())}"><div class="lobby-agents">${slots}</div><button class="ready-button ${me.ready ? "is-ready" : ""}" id="toggle-ready" aria-pressed="${me.ready}"><span>${me.ready ? "✓" : "○"}</span><b>${me.ready ? "You are ready" : "Mark me ready"}</b><small>${me.ready ? "Tap to cancel" : "Required before launch"}</small></button>${hostAction}</section>`;
 }
 
 function offerStepsHtml() {
@@ -556,6 +598,10 @@ function resultRecapHtml() {
 }
 
 function renderGame() {
+  const focused = document.activeElement;
+  const focusedCard = focused?.dataset?.card;
+  const focusedId = focused?.id;
+
   const activeMotion = motionCue;
   motionCue = null;
   const active = state.turn === state.you;
@@ -605,10 +651,16 @@ function renderGame() {
     const networks = state.players.length === 2 ? `<aside class="network-panel ${movementNotice ? "network-updated" : ""}" aria-label="Agent networks"><div class="collections">${state.players.map(collectionHtml).join("")}</div></aside>` : "";
     app.innerHTML = shell(`<div class="match-layout ${state.winner !== null ? "is-result" : ""}">${matchStatus}<div class="board-panel">${board}</div><section class="play-column motion-${activeMotion || "steady"}" id="play-area"><div class="play-content">${playArea}</div></section>${networks}</div>`) + revealOverlayHtml();
   }
+  if (playMode === "wifi" && (!connected || state.players.some(player => !player.connected))) {
+    document.querySelector(".app-content")?.insertAdjacentHTML("afterbegin", `<div class="connection-notice" role="status">${connected ? "Your rival disconnected. Their seat is saved; ask them to reopen the invitation." : "Connection lost. Reconnecting to your room…"}<button class="text-btn" data-home>Leave room</button></div>`);
+    document.querySelectorAll("#offer,#toggle-ready,#start-match,#again,[data-choice]").forEach(button => { button.disabled = true; });
+  }
   bindCommon();
   document.querySelector("#continue-resolution")?.addEventListener("click", finishReveal);
   document.querySelector("#ready-player")?.addEventListener("click", () => { localHandoff = false; render(); });
   document.querySelector("#copy")?.addEventListener("click", shareRoom);
+  document.querySelector("#invite-friend")?.addEventListener("click", shareRoom);
+  document.querySelector(".invitation-link")?.addEventListener("click", event => event.target.select());
   document.querySelector("#share")?.addEventListener("click", shareRoom);
   document.querySelector("#again")?.addEventListener("click", () => send("rematch"));
   document.querySelector("#toggle-ready")?.addEventListener("click", () => send("ready", { ready: !state.players[state.you].ready }));
@@ -617,6 +669,8 @@ function renderGame() {
   document.querySelector("#offer")?.addEventListener("click", () => send("offer", { openId: faceUpId, hiddenId: selected.find(id => id !== faceUpId) }));
   document.querySelector("#swap-card")?.addEventListener("click", () => { swapMode = !swapMode; selected = []; faceUpId = null; renderGame(); });
   document.querySelectorAll("[data-choice]").forEach(el => el.addEventListener("click", () => send("choose", { choice: el.dataset.choice })));
+  const restored = focusedCard ? [...document.querySelectorAll(".hand .card")].find(card => card.dataset.card === focusedCard) : focusedId ? document.getElementById(focusedId) : null;
+  restored?.focus({ preventScroll: true });
 }
 
 function selectCard(id) {
@@ -635,12 +689,16 @@ function selectCard(id) {
   renderGame();
 }
 
+function invitationUrl() {
+  const base = networkMode === "lan" && /^(localhost$|127\.)/.test(location.hostname) && lanAddresses.length ? new URL(lanAddresses[0]).origin : location.origin;
+  return `${base}${location.pathname}?room=${state.room}&network=${networkMode}`;
+}
 async function shareRoom() {
-  const url = `${location.origin}${location.pathname}?room=${state.room}`;
+  const url = invitationUrl();
   try {
     if (navigator.share) await navigator.share({ title: "Join my Spies in Disguise game", text: `Room ${state.room}`, url });
     else { await navigator.clipboard.writeText(url); showToast("Invitation copied"); }
-  } catch (error) { if (error.name !== "AbortError") showToast("Couldn’t share the link"); }
+  } catch (error) { if (error.name !== "AbortError") showToast("Select the invitation link to copy it, or share the room code"); }
 }
 
 function render() { splashVisible ? renderSplash() : state ? renderGame() : renderHome(); }
@@ -661,6 +719,7 @@ window.render_game_to_text = () => JSON.stringify(splashVisible ? { screen: "spl
 window.advanceTime = () => {};
 addEventListener("beforeinstallprompt", event => { event.preventDefault(); installPrompt = event; render(); });
 addEventListener("appinstalled", () => { installPrompt = null; render(); showToast("Spies in Disguise installed"); });
+if (localHost) fetch("/api/lan-addresses").then(response => response.json()).then(data => { lanAddresses = data.addresses || []; if (homePanel === "lan" || state?.phase === "lobby") render(); }).catch(() => {});
 connect();
 render();
 if ("serviceWorker" in navigator && location.protocol !== "file:") addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));

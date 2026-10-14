@@ -9,7 +9,9 @@ npm install
 npm start
 ```
 
-Open `http://localhost:3000` on two devices. For phones on the same Wi-Fi, use your computer's LAN address (for example `http://192.168.1.20:3000`).
+Open `http://localhost:3000` on the host computer. Choose **Same Wi-Fi**, share the displayed local address, and create a room. Both devices must use that same server, remain on the same network, and be able to reach the host computer (firewall and guest-network isolation can prevent this). Keep the host awake. Invitations preserve `network=lan`; browsers cannot discover a server automatically.
+
+**Internet** uses the gateway in `public/config.js`. Invite links join directly with an optional guest name; the six-character code is a fallback. Codes belong to their selected gateway. Deploy both `public/` and `server/` to deliver the current lobby and connection behavior. Lobby hosts can leave and transfer ownership; during a match, temporary disconnects preserve seats, while explicit exit closes the match.
 
 ## Deploy
 

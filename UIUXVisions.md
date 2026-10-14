@@ -1,7 +1,7 @@
 # Spies in Disguise UI/UX
 
 - The app home is shared by website visits and installed PWA launches.
-- Lead with three large mode choices: Bot (recommended), In Person, and Wi-Fi. Each explains who plays and where before selection.
+- Offer Bot (recommended), Pass & Play, Internet, and Same Wi-Fi. Each explains who plays and where before selection.
 - Keep install access visible in the home header; use the native prompt when available and clear platform instructions otherwise.
 - Mobile is action-first: mode cards stack, gameplay keeps the current decision and hand above secondary collections, and controls respect safe areas.
 - Pass-and-play must protect hidden information with explicit handoff screens before a different player sees their decision.
@@ -14,8 +14,8 @@
 - Terminal card effects never masquerade as zero movement: Oracle’s third stage uses a mint victory star/Win label, while Renegade’s uses a red defeat cross/Lose label across cards, dossiers, network previews, and resolution feedback.
 - Mobile hands use a two-column grid so all four contacts remain scannable without horizontal discovery. The sticky action bar always states the current offer-building step.
 - The pursuit board is one numbered 12-space clockwise loop. Agents start opposite each other, six spaces apart, and both move in the same direction. The center shows the remaining relative gap; the legend shows each board space and signed net movement.
-- Primary navigation is a persistent three-item dock: Home, Play, and Rules. Play jumps to mode selection or the current decision, active location is explicit, and leaving an unfinished match always requires confirmation.
-- Launch uses a branded, tap-to-enter signal splash; that gesture safely enables optional synthesized game audio. A persistent header control stores the sound preference. Motion remains restrained and honors reduced-motion settings.
+- Primary navigation is a compact sticky top strip: Home, Play, and Rules. Play jumps to mode selection or the current decision, active location is explicit, and leaving an unfinished match always requires confirmation.
+- Launch directly into home; the first interaction enables optional synthesized game audio. A persistent header control stores the sound preference. Motion remains restrained and honors reduced-motion settings.
 - Larger motion is event-driven, not render-driven: stagger hands only when dealt/exchanged, slide offers only when sent, confirm lobby readiness, pop recruited network chips, and emphasize terminal outcomes. Ordinary selection stays immediate; animate transforms/opacity and honor reduced motion globally.
 - Online rooms open into an explicit lobby with two agent slots, room sharing, connected/ready status, individual ready controls, and a host-only launch button. No cards are dealt before launch.
 - The home screen shows a compact live-duel board. Public hosts opt in; only connected, single-player lobbies appear. Private code rooms stay undiscoverable.
@@ -31,7 +31,7 @@
 
 # Interface density
 - Mode cards are compact decision rows on every viewport: icon, title/context, then a clearly aligned affordance. Recommendations must never compete with the title.
-- The persistent navigation uses a restrained tinted active state; primary game actions, not navigation chrome, carry the strongest filled treatment.
+- The top navigation uses consistent outlined icons and a restrained active underline; primary game actions, not navigation chrome, carry the strongest filled treatment.
 - Secondary information uses higher-contrast muted text, while panels rely on spacing and thin borders instead of oversized empty areas.
 - All controls share four semantic treatments: mint primary, navy outlined secondary, transparent quiet, and red danger. Hover lifts, press compresses, keyboard focus uses a mint ring, and disabled copy explains the missing prerequisite.
 - Interaction audio is consistent: restrained hover ticks on precise pointers, select tones for choices, and distinct offer/start/turn cues. The saved mute preference and reduced-motion preference always win.
@@ -41,7 +41,7 @@
 - Treat the live match as one game table, not unrelated stacked panels. Desktop uses a compact left rail for status, pursuit board, and networks beside the active decision surface.
 - Below 900px the same semantic regions collapse without duplicated markup. Status and the compact board lead into the current decision; networks follow as secondary information.
 - The action surface owns the turn heading, hand or offer, and confirmation control. Its width and card grid must remain stable from 320px phones through wide desktop windows.
-- Mobile matches prefer landscape. Installed PWAs declare landscape-primary; supported browsers request an orientation lock after the player's start gesture, while unsupported portrait contexts show a focused rotate prompt.
+- Both phone orientations remain usable without forced rotation or a blocking prompt.
 - The board labels clockwise direction, the six-space objective, both starting nodes, current positions, and signed net movement without requiring the rules dialog.
 - Beginner help starts with three image-led examples—build an offer, choose a contact, close the gap—before detailed rules. Keep each caption action-focused and cache the artwork for offline use.
 - Solo setup offers Rookie, Field Agent, and Mastermind profiles. Difficulty changes decision quality, never rules or hidden-information access.
@@ -49,3 +49,5 @@
 - At two spaces from interception, the board enters a restrained danger state with one alert cue. Results include final gap, total recruits, the winning network's leading contact, and bot level when relevant.
 - While the rival prepares an offer, show the waiting player's own four-card hand as compact, non-interactive private intel. Keep it visible by default and never expose the rival's hand.
 - One-copy ability contacts replace the normal stage curve with a compact ability strip. Mimic and Slingshot always preview their live movement from public state; never leave a placeholder zero on the card.
+
+- Internet invitations are the primary sharing action, with a selectable link and room code as fallbacks. Same-Wi-Fi invitations use a reachable host address, never localhost. Guest invitations join without setup; names remain optional.

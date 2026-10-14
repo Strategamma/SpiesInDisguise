@@ -1,14 +1,10 @@
 # Goal
-Make recruitment resolution unmistakable: which card each player received, what it did, and where each agent moved.
-
+Make primary navigation lighter and give phone gameplay more room.
 # Scope
-Replace the flying full-card reveal treatment and redesign the persistent post-choice recap. Preserve authoritative timing, hidden-card privacy before choice, rules, and networking.
-
+Replace the floating bottom dock with a compact sticky top strip; preserve Home/Play/Rules and match-exit safeguards.
 # Approach
-Use a grounded resolution sheet with explicit “chose” and “receives” labels, compact contact identities, and recipient-specific effects. Persist a “Last exchange” recap beside the chase board with before/after spaces.
-
+Reuse the existing semantic buttons and handlers, add consistent small SVG icons and an underline active state, remove obsolete dock styling and bottom spacing.
 # Risks
-Showing effects for the wrong recipient, revealing concealed data early, stale recaps, mobile crowding, and result timing drift.
-
+Sticky navigation obscuring scroll targets, stale active states after dialogs, and overlap with game actions.
 # Verification
-Test recipient mapping and movement deltas, run the full suite and syntax checks, inspect the supplied recording where permitted, and verify reduced-motion behavior.
+Phone portrait/landscape and desktop browser checks; navigation, Rules, and leave-confirmation interactions; existing tests and syntax checks.

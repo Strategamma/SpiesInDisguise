@@ -1,4 +1,5 @@
 import http from "node:http";
+import { networkInterfaces } from "node:os";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,10 +34,14 @@ function healthSnapshot() {
 const server = http.createServer(async (req, res) => {
   metrics.httpRequests += 1;
   if (req.url === "/health") { res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }); return res.end(JSON.stringify(healthSnapshot())); }
+  if (req.url === "/api/lan-addresses") {
+    const addresses = process.env.RENDER ? [] : Object.values(networkInterfaces()).flat().filter(entry => entry && entry.family === "IPv4" && !entry.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(entry.address)).map(entry => `http://${entry.address}:${port}/?network=lan`);
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" }); return res.end(JSON.stringify({ addresses }));
+  }
   const path = normalize(decodeURIComponent(new URL(req.url, "http://local").pathname)).replace(/^(\.\.[/\\])+/, "");
   const file = join(root, path === "/" ? "index.html" : path);
   if (!file.startsWith(root)) { res.writeHead(403); return res.end("Forbidden"); }
-  try { const data = await readFile(file); res.writeHead(200, { "content-type": types[extname(file)] || "application/octet-stream", "cache-control": extname(file) === ".html" ? "no-cache" : "public, max-age=3600" }); res.end(data); }
+  try { const data = await readFile(file); res.writeHead(200, { "content-type": types[extname(file)] || "application/octet-stream", "cache-control": [".html", ".js", ".css"].includes(extname(file)) ? "no-cache" : "public, max-age=3600" }); res.end(data); }
   catch { try { const data = await readFile(join(root, "index.html")); res.writeHead(200, { "content-type": types[".html"] }); res.end(data); } catch { res.writeHead(404); res.end("Not found"); } }
 });
 
@@ -59,27 +64,32 @@ wss.on("connection", ws => {
     try {
       message = JSON.parse(raw.toString());
       if (message.type === "create") {
+        if (ws.identity) throw new Error("You already have a room. Leave it before creating another.");
         if (rooms.size >= maxRooms) throw new Error("The gateway is at room capacity.");
         let code; do { code = roomCode(); } while (rooms.has(code));
         const player = newPlayer(message.name, message.protocol); player.socket = ws; const room = newRoom(code, player); room.public = message.public === true; rooms.set(code, room); metrics.roomsCreated += 1; ws.identity = { code, index: 0 }; update(room); broadcastPresence();
       } else if (message.type === "join") {
+        if (ws.identity) throw new Error("You already have a room. Leave it before joining another.");
         const code = String(message.room || "").toUpperCase(); const room = rooms.get(code); if (!room) throw new Error("Room not found.");
         const reconnect = room.players.findIndex(p => p.token === message.token);
         let index = reconnect;
-        if (reconnect >= 0) { room.players[reconnect].socket = ws; room.players[reconnect].connected = true; }
+        if (reconnect >= 0) { const previous = room.players[reconnect].socket; if (previous && previous !== ws) { previous.identity = null; previous.close(4001, "Connected on another device"); } room.players[reconnect].socket = ws; room.players[reconnect].connected = true; }
         else { const player = newPlayer(message.name, message.protocol); player.socket = ws; addPlayer(room, player); index = room.players.length - 1; }
-        ws.identity = { code, index }; update(room); broadcastPresence();
+        room.updatedAt = Date.now(); ws.identity = { code, index }; update(room); broadcastPresence();
       } else {
         if (!ws.identity) throw new Error("Join a room first.");
         const room = rooms.get(ws.identity.code); if (!room) throw new Error("Room expired."); const i = ws.identity.index;
+        if (room.players[i]?.socket !== ws) throw new Error("This connection has been replaced. Rejoin the room.");
         if (message.type === "leave") {
           const player = room.players[i];
           if (room.phase === "lobby") {
-            if (i === 0) { room.players.slice(1).forEach(other => emit(other.socket, { type: "room_closed" })); rooms.delete(room.code); }
+            if (i === 0 && room.players.length === 1) rooms.delete(room.code);
+            else if (i === 0) { room.players.shift(); room.players[0].ready = false; if (room.players[0].socket?.identity) room.players[0].socket.identity.index = 0; update(room); }
             else { room.players.splice(i, 1); update(room); }
-          } else if (player?.socket === ws) { player.connected = false; player.socket = null; update(room); }
+          } else if (player?.socket === ws) { room.players.forEach(other => { if (other.socket && other.socket !== ws) { emit(other.socket, { type: "room_closed", message: "Your rival left the match. Create a new room to play again." }); other.socket.identity = null; } }); rooms.delete(room.code); }
           ws.identity = null; emit(ws, { type: "left" }); broadcastPresence(); return;
         }
+        if (["offer", "swap", "choose"].includes(message.type) && room.players.some(player => !player.connected)) throw new Error("Wait for your rival to reconnect.");
         if (message.type === "ready") setReady(room, i, message.ready);
         else if (message.type === "start") startGame(room, i);
         else if (message.type === "offer") submitOffer(room, i, message.openId, message.hiddenId);
@@ -90,9 +100,9 @@ wss.on("connection", ws => {
           const chosen = offer[message.choice]; const other = offer[message.choice === "open" ? "hidden" : "open"];
           room.players.forEach(player => emit(player.socket, { type: "reveal", choice: message.choice, chosen, other, chooser: i }));
         }
-        else if (message.type === "rematch") { room.rematchVotes.add(i); if (room.rematchVotes.size === 2) restart(room); }
+        else if (message.type === "rematch") { if (room.winner === null) throw new Error("Finish this match before requesting a rematch."); if (room.players.length !== 2 || room.players.some(player => !player.connected)) throw new Error("Wait for your rival to reconnect."); room.rematchVotes.add(i); if (room.rematchVotes.size === 2) restart(room); }
         else throw new Error("Unknown action.");
-        update(room);
+        room.updatedAt = Date.now(); update(room);
       }
     } catch (error) {
       metrics.messageErrors += 1;
@@ -102,10 +112,10 @@ wss.on("connection", ws => {
     }
   });
   ws.on("error", error => { metrics.websocketErrors += 1; log("websocket_error", { error: error.message }); });
-  ws.on("close", () => { metrics.websocketCloses += 1; if (!ws.identity) return; const room = rooms.get(ws.identity.code); const player = room?.players[ws.identity.index]; if (player?.socket === ws) { player.connected = false; if (room.phase === "lobby") player.ready = false; update(room); broadcastPresence(); } });
+  ws.on("close", () => { metrics.websocketCloses += 1; if (!ws.identity) return; const room = rooms.get(ws.identity.code); const player = room?.players[ws.identity.index]; if (player?.socket === ws) { player.connected = false; room.updatedAt = Date.now(); if (room.phase === "lobby") player.ready = false; update(room); broadcastPresence(); } });
 });
 wss.on("error", error => { metrics.websocketErrors += 1; log("websocket_server_error", { error: error.message }); });
 
-const heartbeat = setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) ws.terminate(); else { ws.isAlive = false; ws.ping(); } } const expiry = Date.now() - 1000 * 60 * 60 * 6; let changed = false; for (const [code, room] of rooms) if (room.updatedAt < expiry) { rooms.delete(code); metrics.roomsExpired += 1; changed = true; } if (changed) broadcastPresence(); }, 30000);
+const heartbeat = setInterval(() => { for (const ws of wss.clients) { if (!ws.isAlive) ws.terminate(); else { ws.isAlive = false; ws.ping(); } } const expiry = Date.now() - 1000 * 60 * 60 * 6; let changed = false; for (const [code, room] of rooms) if (room.updatedAt < expiry || (room.players.every(player => !player.connected) && room.updatedAt < Date.now() - 15 * 60 * 1000)) { room.players.forEach(player => { emit(player.socket, { type: "room_closed", message: "This room expired. Create a fresh room to play." }); if (player.socket) player.socket.identity = null; }); rooms.delete(code); metrics.roomsExpired += 1; changed = true; } if (changed) broadcastPresence(); }, 30000);
 wss.on("close", () => clearInterval(heartbeat));
 server.listen(port, "0.0.0.0", () => { startupDurationMs = Date.now() - processStartedAt; log("server_ready", { port, startupDurationMs, version: healthSnapshot().version }); });
