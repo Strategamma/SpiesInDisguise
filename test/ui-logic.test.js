@@ -60,3 +60,22 @@ test("resolution recap keeps ownership, movement, and board spaces together", ()
     { playerIndex: 0, kind: "courier", delta: 2, fromSpace: 12, toSpace: 2 }
   ]);
 });
+
+test("applied exchange summaries report actual movement and Oracle count, not a future stage", async () => {
+  const { exchangeSummary } = await import("../public/ui-logic.js");
+  const before = { players: [{ progress: 0, collection: { oracle: 1 } }, { progress: 0, collection: {} }] };
+  const after = { winner: null, players: [{ progress: 0, lastMovement: 0, collection: { oracle: 2 } }, { progress: 0, lastMovement: 0, collection: { ghost: 1 } }] };
+  const summary = exchangeSummary(before, after, { chooser: 0, chosen: { kind: "oracle" }, other: { kind: "ghost" } });
+  assert.equal(summary[0].outcome, ""); assert.deepEqual(summary[0].notes, ["2 of 3 Oracles"]);
+  assert.equal(summary[1].delta, 0); assert.equal(summary[1].summary, "Stayed in place");
+});
+
+test("exchange summaries include pushes and removed contacts", async () => {
+  const { exchangeSummary } = await import("../public/ui-logic.js");
+  const before = { players: [{ progress: 0, collection: {} }, { progress: 0, collection: { renegade: 2 } }] };
+  const after = { winner: null, players: [{ progress: 2, lastMovement: 2, collection: { jammer: 1 } }, { progress: 0, lastMovement: 1, collection: { renegade: 1, cleaner: 1 } }] };
+  const summary = exchangeSummary(before, after, { chooser: 0, chosen: { kind: "jammer" }, other: { kind: "cleaner" } });
+  assert.ok(summary[0].notes.includes("Rival pushed back 1 space"));
+  assert.ok(summary[1].notes.includes("Removed 1 Renegade"));
+  assert.equal(summary[1].delta, 0);
+});

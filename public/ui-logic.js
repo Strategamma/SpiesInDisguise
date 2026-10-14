@@ -56,3 +56,20 @@ export function resolutionMovementNotice(previous, next, reveal) {
     toSpace: boardPosition(item.playerIndex, next.players[item.playerIndex].progress) + 1
   }));
 }
+
+export function exchangeSummary(previous, next, reveal) {
+  return resolutionMovementNotice(previous, next, reveal).map(item => {
+    const before = previous.players[item.playerIndex];
+    const after = next.players[item.playerIndex];
+    const count = Number(after.collection[item.kind] || 0);
+    const notes = [];
+    if (item.kind === "jammer") notes.push("Rival pushed back 1 space");
+    if (item.kind === "cleaner" && before.collection.renegade > (after.collection.renegade || 0)) notes.push("Removed 1 Renegade");
+    if (item.delta !== after.lastMovement && Number.isFinite(after.lastMovement)) notes.push(`Contact ${after.lastMovement > 0 ? "+" : ""}${after.lastMovement}; rival push ${item.delta - after.lastMovement}`);
+    if (item.kind === "oracle") notes.push(`${count} of 3 Oracles`);
+    if (item.kind === "renegade") notes.push(`${count} of 3 Renegades`);
+    const movement = item.delta === 0 ? "Stayed in place" : `Moved ${item.delta > 0 ? "+" : ""}${item.delta} ${Math.abs(item.delta) === 1 ? "space" : "spaces"}`;
+    const outcome = next.winner !== null && next.winner !== undefined ? next.winner === item.playerIndex ? "victory" : "defeat" : "";
+    return { ...item, notes, outcome, summary: `${movement}${outcome ? outcome === "victory" ? " · Mission won" : " · Mission lost" : ""}` };
+  });
+}

@@ -3,13 +3,17 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import WebSocket from 'ws';
+import http from 'node:http';
 
 // Exercise the actual gateway: unit rules tests cannot catch socket ownership bugs.
 test('gateway preserves rooms, rejects stale actions, and completes a rematch', { timeout: 20000 }, async t => {
   const port = 31000 + Math.floor(Math.random() * 10000);
-  const server = spawn(process.execPath, ['server/index.js'], { env: { ...process.env, PORT: String(port) }, stdio: ['ignore', 'pipe', 'pipe'] });
+  const server = spawn(process.execPath, ['server/index.js'], { env: { ...process.env, PORT: String(port), RECONNECT_GRACE_MS: '100' }, stdio: ['ignore', 'pipe', 'pipe'] });
   t.after(() => server.kill());
   await new Promise((resolve, reject) => { server.stdout.on('data', chunk => { if (chunk.toString().includes('server_ready')) resolve(); }); server.once('exit', code => reject(new Error(`Server exited ${code}`))); });
+  const invalid = await new Promise((resolve, reject) => http.get({ hostname: '127.0.0.1', port, path: '/%ZZ' }, response => { response.resume(); resolve(response.statusCode); }).on('error', reject));
+  assert.equal(invalid, 400);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/health`)).status, 200);
   const clients = [];
   async function client() {
     const ws = new WebSocket(`ws://127.0.0.1:${port}`); clients.push(ws);
@@ -25,6 +29,8 @@ test('gateway preserves rooms, rejects stale actions, and completes a rematch', 
   t.after(() => clients.forEach(ws => ws.terminate()));
   const a = await client(), b = await client();
   const created = await a.send({ type: 'create', name: 'A', protocol: 3 }); const room = created.state.room;
+  assert.equal((await a.send({type:"name",name:"Updated host"})).state.players[0].name,"Updated host");
+  assert.match((await a.send({type:"name",name:" "},"error")).message,/codename/);
   assert.match((await a.send({ type: 'create' }, 'error')).message, /already/);
   await b.send({ type: 'join', room, name: 'B', protocol: 3 });
   const third = await client(); assert.match((await third.send({ type: 'join', room }, 'error')).message, /full/);
@@ -41,6 +47,15 @@ test('gateway preserves rooms, rejects stale actions, and completes a rematch', 
   // Finish via fresh clients so this test also verifies explicit room exit cleanup.
   await replacement.send({ type: 'leave' }, 'left');
   assert.match((await third.send({ type: 'join', room }, 'error')).message, /not found/);
+  const abandoned = await client(), keeper = await client();
+  const disconnectedRoom = await abandoned.send({ type: 'create', protocol: 3 });
+  await keeper.send({ type: 'join', room: disconnectedRoom.state.room, protocol: 3 });
+  abandoned.ws.close(); await once(abandoned.ws, 'close');
+  await third.send({ type: 'leave_room', room: disconnectedRoom.state.room, token: 'wrong' }, 'left');
+  assert.equal((await keeper.send({ type: 'ready', ready: true })).state.players.length, 2);
+  await third.send({ type: 'leave_room', room: disconnectedRoom.state.room, token: disconnectedRoom.token }, 'left');
+  const retained = await keeper.send({ type: 'ready', ready: true });
+  assert.equal(retained.state.players.length, 1); assert.equal(retained.state.isHost, true);
   const host = await client(), rival = await client();
   const c = await host.send({ type: 'create', protocol: 3 });
   let r = await rival.send({ type: 'join', room: c.state.room, protocol: 3 });
@@ -69,5 +84,15 @@ test('gateway preserves rooms, rejects stale actions, and completes a rematch', 
   const h = await client(), g = await client(); const lobby = await h.send({ type: 'create', protocol: 3 });
   await g.send({ type: 'join', room: lobby.state.room, protocol: 3 }); await h.send({ type: 'leave' }, 'left');
   const promoted = await g.send({ type: 'ready', ready: true }); assert.equal(promoted.state.isHost, true); assert.equal(promoted.state.players.length, 1);
+  const lostHost = await client(), survivor = await client();
+  const migrate = await lostHost.send({ type: 'create', protocol: 3 });
+  await survivor.send({ type: 'join', room: migrate.state.room, protocol: 3 });
+  lostHost.ws.close(); await once(lostHost.ws, 'close');
+  await new Promise(resolve => setTimeout(resolve, 150));
+  const takeover = await survivor.send({ type: 'ready', ready: true });
+  assert.equal(takeover.state.isHost, true); assert.equal(takeover.state.players.length, 1);
+  const flood = await client(); await flood.send({type:"create",protocol:3});
+  let limit; for(let request=0;request<12;request++) limit=await flood.send({type:"create",protocol:3},"error");
+  assert.equal(limit.code,"rate_limited");
   assert.equal((await (await fetch(`http://127.0.0.1:${port}/api/lan-addresses`)).json()).addresses instanceof Array, true);
 });

@@ -1,31 +1,23 @@
 # Project memory
 
 ## Product
-`Spies in Disguise` is an installable two-player bluffing game for decadenceinc.com. It is inspired by the public “one face-up, one face-down; opponent chooses” mechanism, not an official Agent Avenue adaptation. Preserve original branding; no licensed Agent Avenue assets.
+Spies in Disguise is an accountless, installable two-player bluffing game for decadenceinc.com. Preserve its original contact identities, mint/violet spy theme and parent-collection link; it is not an official Agent Avenue adaptation.
 
 ## Architecture
-- Static PWA in `public/`: semantic HTML, CSS, and dependency-free browser JavaScript.
-- `.github/workflows/pages.yml` publishes `public/` to GitHub Pages on pushes to `main`; repository Pages source must be GitHub Actions.
-- `public/local-game.js` powers offline Bot and privacy-gated pass-and-play modes; Wi-Fi mode continues to use the authoritative server.
-- Authoritative multiplayer gateway in `server/`: Node.js + `ws`, also serves `public/` for local testing or a single-service deployment.
-- Internet uses `public/config.js` (Render). Same-Wi-Fi uses the locally hosted origin with `network=lan`; `/api/lan-addresses` lists host addresses. Both devices need the reachable local server; no browser discovery.
-- Six-character ephemeral rooms; public lobbies expose only waiting hosts. Guest names are optional. Invitations join directly; endpoint-scoped local tokens restore seats.
-- Online rooms use a server-authoritative lobby: both players ready, host starts, then hands are dealt. Protocol `3` enables volatile cards; older rooms retain the core deck.
+Dependency-free semantic DOM/CSS/JavaScript PWA in `public/`. `public/local-game.js` owns offline bot/pass-and-play rules; `server/game.js` owns online rules; Node + `ws` gateway also serves static assets. `public/ui-logic.js` derives public display summaries. No render loop or engine framework.
 
-## Game rules
-Two players begin six spaces apart on a 12-space clockwise loop. The 38-card core has six recurring contacts (six copies each) and two unique contacts. The default 42-card deck adds one Jammer, Cleaner, Mimic, and Slingshot; paired effects resolve simultaneously from the pre-move state. Up to four face-down exchanges before offering. Offer two different contacts, open/concealed; duplicates only if the whole hand matches. The opponent chooses one and the active player gets the other. Recruits apply signed stage movement. Gaining six spaces intercepts. Three Oracles wins; three Renegades loses. Resolve outcomes after both movements; the active player wins ties. Empty-deck play continues until the next player cannot offer two cards. No market/team variants.
+GitHub Actions publishes `public/` to Pages on main; Render is configured in `public/config.js`. `SPIES_IN_DISGUISE_PUBLIC_URL` defines Internet invitation frontend when hosted locally. Same-Wi-Fi uses the local host origin and `/api/lan-addresses`; both devices need the reachable server. Browsers do not discover local servers. Multiple interfaces require explicit selection, with no loopback invitation fallback.
 
-## Conventions
-- Server is the sole authority for hands, offers, turns, movement, and outcomes.
-- Never send an opponent's hand or concealed offer card to a client.
-- Server emits reveal before updated state; concealed identities never appear pre-choice.
-- Touch targets are at least 44px; primary play fits narrow phones.
-- Compact sticky top navigation uses Home/Play/Rules, 44px targets, and an active underline; match exit requires confirmation.
-- Audio starts after a user gesture; mute and reduced-motion preferences are honored.
-- Board position is cumulative movement modulo 12; player two starts at index 6. Relative movement of ±6 triggers interception.
-- Portrait and landscape both work without rotation prompts; home opens directly.
-- Matches: two columns from 900px; action-led mobile flow.
-- Cards show current/movement/landing spaces; details in dossiers and accessibility labels.
+## Rules
+42 cards: 38-card core plus one each Jammer, Cleaner, Mimic and Slingshot. Protocol 3 enables volatile contacts; older clients keep the core deck. Offer two different contacts, one visible/one concealed, unless the whole hand matches. Chooser recruits one, offerer the other. Simultaneous effects use pre-move state. Cleaner removes only its recipient’s Renegade. A 12-space loop begins six spaces apart; six relative movement intercepts. Three Oracles win, three Renegades lose, active offerer wins ties. Four optional exchanges; empty-deck play continues until next player cannot offer two cards.
 
-## Current state
-Playable 1v1 PWA with bots, offline modes, lobbies, reconnects, and monitoring. Lobby host exit transfers ownership; explicit match exit closes the room. Replaced connections clear authority/reveals; gateway switches cancel requests; no mid-match rematch. All-disconnected rooms expire after 15 minutes. Internet deployment currently runs an older waiting-room protocol; deploy updated server for lobby/lifecycle parity.
+## Lifecycle and privacy
+Server-authoritative ready lobby; host starts only when both connected/ready. Six-character ephemeral rooms; endpoint-scoped tokens restore seats. Lobby host loss transfers after 30-second grace when a survivor remains. Explicit match exit closes the room; all-disconnected rooms expire after 15 minutes. Rooms remain in memory; server restart requires new rooms. Authenticated queued leave intents release disconnected seats on reconnect. Per-connection action/create limits supplement payload/room limits.
+
+Never expose rival hands or concealed identity pre-choice. Bots use only their hand and public estimates. Views copy mutable data. Match IDs reset feedback; public applied exchange summaries include pushes, removals and resolved outcome. Recruitment counts survive Cleaner removal.
+
+## Experience conventions
+44px minimum controls; decision-first phone layout; compact top Home/Play/Rules navigation. Native modal dialogs preserve focus and open state on updates. Reveals advance manually; celebration fires once per match. Respect reduced motion and mute; no hover audio. Editable guest names, A/B seat labels, privacy-gated shared-device handoff. Versioned/validated offline saves resume explicitly; offline rematches alternate opener. Offline saves never authorize online seats.
+
+## Verification boundary
+Local tests and browser multiplayer pass; live Render health timed out. Deployment parity, physical Wi-Fi/phones, audible feedback, assistive technology and human fun/balance remain release gates.

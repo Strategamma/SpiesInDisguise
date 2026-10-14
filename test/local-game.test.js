@@ -25,8 +25,7 @@ test("bot profiles stay legal and the mastermind accounts for the rival network"
   game.players[0].collection.analyst = 1;
   game.offer = { by: 0, open: { id: "a", kind: "courier" }, hidden: { id: "b", kind: "analyst" } };
   game.phase = "choose";
-  assert.equal(chooseBotCard(game, "rookie"), "open");
-  assert.equal(chooseBotCard(game, "mastermind"), "hidden");
+  for (const profile of ["rookie", "balanced", "mastermind"]) assert.ok(["open", "hidden"].includes(chooseBotCard(game, profile)));
   game.phase = "offer"; game.turn = 1; game.offer = null;
   for (const profile of ["rookie", "balanced", "mastermind"]) {
     const offer = chooseBotOffer(game, profile);
@@ -64,4 +63,30 @@ test("local volatile contacts match online Jammer and Mimic behavior", () => {
   game.players[0].hand = [{ id: "m", kind: "mimic" }, { id: "g", kind: "ghost" }, { id: "o", kind: "oracle" }, { id: "h", kind: "handler" }];
   localOffer(game, 0, "g", "m"); localChoose(game, 1, "open");
   assert.equal(game.players[0].progress, 7);
+});
+
+
+test("bot decisions cannot read concealed contacts, the deck, or the rival hand", () => {
+  const game = createLocalGame("bot");
+  game.offer = { open: { kind: "courier" } };
+  Object.defineProperty(game.offer, "hidden", { get() { throw new Error("secret accessed"); } });
+  Object.defineProperty(game, "deck", { get() { throw new Error("deck accessed"); } });
+  Object.defineProperty(game.players[0], "hand", { get() { throw new Error("rival hand accessed"); } });
+  for (const profile of ["rookie", "balanced", "mastermind"]) assert.ok(["open", "hidden"].includes(chooseBotCard(game, profile)));
+});
+
+
+test("local views remain immutable across recruitment and swaps", () => {
+  const game = createLocalGame("local");
+  game.players[1].collection.oracle = 1;
+  game.players[0].hand = [{ id: "o", kind: "oracle" }, { id: "g", kind: "ghost" }];
+  localOffer(game, 0, "o", "g");
+  const before = localView(game, 1);
+  localChoose(game, 1, "open");
+  assert.equal(before.players[1].collection.oracle, 1);
+  assert.equal(localView(game, 1).players[1].collection.oracle, 2);
+  before.players[1].collection.oracle = 99;
+  before.hand[0].kind = "sleeper";
+  assert.equal(game.players[1].collection.oracle, 2);
+  assert.notEqual(game.players[1].hand[0].kind, "sleeper");
 });

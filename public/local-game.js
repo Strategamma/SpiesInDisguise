@@ -1,3 +1,4 @@
+import { exchangeSummary } from "./ui-logic.js";
 export const LOCAL_CONTACTS = {
   courier: [1, 2, 3], analyst: [-1, 6, -1], ghost: [0, 2, 6],
   handler: [-1, -1, -2], oracle: [0, 0, 0], renegade: [2, 3, 0],
@@ -14,12 +15,12 @@ function makeDeck(random = Math.random) {
   return deck;
 }
 
-function player(name) { return { name, hand: [], collection: {}, progress: 0, lastMovement: 0, swapsRemaining: 4, connected: true }; }
+function player(name) { return { name, hand: [], collection: {}, progress: 0, lastMovement: 0, swapsRemaining: 4, recruits: 0, connected: true }; }
 function draw(game, target) { while (target.hand.length < 4 && game.deck.length) target.hand.push(game.deck.pop()); }
 
 export function createLocalGame(mode, humanName = "Agent", random = Math.random, options = {}) {
-  const opponent = mode === "bot" ? (options.botName || "Cipher Bot") : "Player Two";
-  const game = { mode, room: mode === "bot" ? "BOT" : "LOCAL", players: [player(humanName), player(opponent)], deck: makeDeck(random), turn: 0, phase: "offer", offer: null, winner: null, resultReason: "" };
+  const opponent = mode === "bot" ? (options.botName || "Cipher Bot") : (options.opponentName || "Agent Two");
+  const game = { matchId: `${Date.now()}-${Math.random().toString(36).slice(2)}`, mode, room: mode === "bot" ? "BOT" : "LOCAL", players: [player(humanName), player(opponent)], deck: makeDeck(random), starter: options.starter === 1 ? 1 : 0, turn: options.starter === 1 ? 1 : 0, phase: "offer", offer: null, winner: null, resultReason: "" };
   game.players.forEach(p => draw(game, p));
   return game;
 }
@@ -58,7 +59,7 @@ function recruitPair(game, recruits) {
   const snapshot = game.players.map(target => ({ progress: target.progress, lastMovement: target.lastMovement, collection: { ...target.collection } }));
   const effects = recruits.map(({ playerIndex, card }) => ({ playerIndex, card, movement: previewMovement(game, playerIndex, card, snapshot) }));
   for (const { playerIndex, card } of effects) {
-    const target = game.players[playerIndex]; target.collection[card.kind] = (target.collection[card.kind] || 0) + 1;
+    const target = game.players[playerIndex]; target.collection[card.kind] = (target.collection[card.kind] || 0) + 1; target.recruits += 1;
   }
   for (const { playerIndex, card, movement } of effects) {
     const target = game.players[playerIndex]; target.progress += movement; target.lastMovement = movement;
@@ -70,9 +71,12 @@ function recruitPair(game, recruits) {
 export function localChoose(game, playerIndex, choice) {
   if (game.winner !== null || game.phase !== "choose" || !game.offer || game.offer.by === playerIndex) throw new Error("It isn’t time to choose.");
   if (!['open', 'hidden'].includes(choice)) throw new Error("Choose one of the two signals.");
+  const before = { players: game.players.map(p => ({ progress: p.progress, lastMovement: p.lastMovement, collection: { ...p.collection } })) };
   const active = game.offer.by;
   recruitPair(game, [{ playerIndex, card: game.offer[choice] }, { playerIndex: active, card: game.offer[choice === "open" ? "hidden" : "open"] }]);
-  resolve(game, active); game.offer = null;
+  resolve(game, active);
+  game.lastExchange = exchangeSummary(before, game, { chooser: playerIndex, chosen: game.offer[choice], other: game.offer[choice === "open" ? "hidden" : "open"] });
+  game.offer = null;
   if (game.winner === null) { game.turn = playerIndex; game.phase = "offer"; }
 }
 
@@ -91,7 +95,7 @@ function resolve(game, active) {
 }
 
 export function localView(game, you) {
-  return { room: game.room, mode: game.mode, you, turn: game.turn, phase: game.phase, winner: game.winner, resultReason: game.resultReason, hand: game.players[you].hand, swapsRemaining: game.players[you].swapsRemaining, deckRemaining: game.deck.length, players: game.players.map(p => ({ name: p.name, collection: p.collection, progress: p.progress, lastMovement: p.lastMovement, connected: true })), offer: game.offer ? { open: game.offer.open, by: game.offer.by } : null };
+  return { matchId: game.matchId, lastExchange: game.lastExchange ? structuredClone(game.lastExchange) : null, room: game.room, mode: game.mode, you, turn: game.turn, phase: game.phase, winner: game.winner, resultReason: game.resultReason, hand: game.players[you].hand.map(card => ({ ...card })), swapsRemaining: game.players[you].swapsRemaining, deckRemaining: game.deck.length, players: game.players.map(p => ({ name: p.name, recruits: p.recruits, collection: { ...p.collection }, progress: p.progress, lastMovement: p.lastMovement, connected: true })), offer: game.offer ? { open: { ...game.offer.open }, by: game.offer.by } : null };
 }
 
 function cardValue(game, playerIndex, card) {
@@ -109,10 +113,10 @@ function botWeight(profile) {
   return profile === "rookie" ? 0 : profile === "mastermind" ? .8 : .35;
 }
 
-export function chooseBotOffer(game, profile = "balanced") {
+export function chooseBotOffer(game, profile = "balanced", random = Math.random) {
   const hand = game.players[1].hand;
   const weight = botWeight(profile);
-  let best = null;
+  const candidates = [];
   for (let i = 0; i < hand.length; i++) for (let j = i + 1; j < hand.length; j++) {
     if (hand[i].kind === hand[j].kind && hand.some(c => c.kind !== hand[i].kind)) continue;
     const firstOutcome = cardValue(game, 1, hand[j]) - cardValue(game, 0, hand[i]) * weight;
@@ -121,15 +125,38 @@ export function chooseBotOffer(game, profile = "balanced") {
     const firstLooksSafer = cardValue(game, 0, hand[i]) <= cardValue(game, 0, hand[j]);
     const open = profile === "mastermind" && !firstLooksSafer ? hand[j] : hand[i];
     const hidden = open === hand[i] ? hand[j] : hand[i];
-    if (!best || score > best.score) best = { openId: open.id, hiddenId: hidden.id, score };
+    candidates.push({ openId: open.id, hiddenId: hidden.id, score });
   }
-  return best;
+  const best = Math.max(...candidates.map(candidate => candidate.score));
+  const tolerance = profile === "rookie" ? 12 : profile === "balanced" ? 5 : 2;
+  const options = candidates.filter(candidate => candidate.score >= best - tolerance);
+  return options[Math.min(options.length - 1, Math.floor(random() * options.length))];
 }
 
-export function chooseBotCard(game, profile = "balanced") {
-  const bot = 1; const open = game.offer.open; const hidden = game.offer.hidden;
+export function chooseBotCard(game, profile = "balanced", random = Math.random) {
+  const bot = 1;
+  const open = game.offer.open;
   const weight = botWeight(profile);
-  const openScore = cardValue(game, bot, open) - cardValue(game, 0, hidden) * weight;
-  const hiddenScore = cardValue(game, bot, hidden) - cardValue(game, 0, open) * weight;
+  // Estimate the secret from publicly possible contacts, never its actual identity,
+  // the draw pile, or the rival's private hand.
+  const unknown = Object.entries(COPIES).map(([kind, copies]) => {
+    const recruited = game.players.reduce((sum, player) => sum + (player.collection[kind] || 0), 0);
+    const held = game.players[bot].hand.filter(card => card.kind === kind).length;
+    return { kind, copies: Math.max(0, copies - recruited - held - Number(open.kind === kind)) };
+  }).filter(item => item.copies > 0);
+  const total = unknown.reduce((sum, item) => sum + item.copies, 0);
+  const expected = playerIndex => total ? unknown.reduce((sum, item) => sum + cardValue(game, playerIndex, item) * item.copies, 0) / total : 0;
+  const openScore = cardValue(game, bot, open) - expected(0) * weight;
+  const hiddenScore = expected(bot) - cardValue(game, 0, open) * weight;
+  const tolerance = profile === "rookie" ? 10 : profile === "balanced" ? 4 : 1;
+  if (Math.abs(hiddenScore - openScore) <= tolerance) return random() < .5 ? "hidden" : "open";
   return hiddenScore > openScore ? "hidden" : "open";
+}
+
+export function chooseBotSwap(game, deckRemaining, profile = "balanced", random = Math.random) {
+  const bot = game.players[1];
+  if (game.phase !== "offer" || game.turn !== 1 || !deckRemaining || !bot.swapsRemaining) return null;
+  const worst = bot.hand.map(card => ({ card, score: cardValue(game, 1, card) })).sort((a, b) => a.score - b.score)[0];
+  const threshold = profile === "rookie" ? -12 : -4;
+  return worst && worst.score <= threshold && random() < (profile === "rookie" ? .35 : .8) ? worst.card.id : null;
 }
